@@ -116,7 +116,24 @@ make -j$(nproc)
 ./qt-msg-reader [file.msg]
 ```
 
+## Python Packages
+
+The application bundles Python packages for deployment:
+
+**Development:** Uses `.venv/lib/python3.14/site-packages` from the source directory
+
+**Deployment:** Bundles `python-packages/` directory next to the executable
+
+The `MsgParser::findSitePackages()` method searches in this order:
+1. `<exe_dir>/python-packages/` (bundled, for deployment)
+2. `.venv/lib/python3.14/site-packages` (development)
+
+CMake automatically copies packages from `.venv` to `build/python-packages/` during build.
+
 ## Recent Changes
+- Bundled Python packages with the executable for deployment
+- Added `findSitePackages()` to locate packages (bundled or venv)
+- CMake copies site-packages to build directory
 - Added comprehensive comments to all methods and key code sections
 - Updated README.md with current project structure and usage
 - Added status log window with timestamped entries

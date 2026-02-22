@@ -33,11 +33,33 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${Python3_INCLUDE_DIRS}
 )
 
+# Define paths for Python packages
+set(PYTHON_VENV_PATH "${CMAKE_CURRENT_SOURCE_DIR}/.venv")
+set(PYTHON_PACKAGES_DIR "python-packages")
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    PYTHON_VENV_PATH="${CMAKE_CURRENT_SOURCE_DIR}/.venv"
+    PYTHON_VENV_PATH="${PYTHON_VENV_PATH}"
+    PYTHON_PACKAGES_DIR="${PYTHON_PACKAGES_DIR}"
 )
 
+# Copy Python packages to build directory for development
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory 
+        "${PYTHON_VENV_PATH}/lib/python3.14/site-packages"
+        "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
+    COMMENT "Copying Python packages to build directory"
+)
+
+# Install target with bundled Python packages
 install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY "${PYTHON_VENV_PATH}/lib/python3.14/site-packages/"
+    DESTINATION ${PYTHON_PACKAGES_DIR}
+    PATTERN "*.pyc" EXCLUDE
+    PATTERN "__pycache__" EXCLUDE
 )
