@@ -13,14 +13,16 @@ Qt MSG Reader is a desktop application for viewing Microsoft Outlook MSG files. 
 qt-msg-reader/
 ├── src/
 │   ├── main.cpp           # Application entry point
-│   ├── MainWindow.h/cpp   # Main window UI
+│   ├── MainWindow.h/cpp   # Main window UI with file browser, message view, attachments, status log
 │   ├── MsgParser.h/cpp    # Python bridge for MSG parsing
 │   ├── EmailTypes.h       # Data structures (EmailMessage, EmailAttachment)
-│   ├── MsgFileModel.h/cpp # File system model for browsing
-│   └── AttachmentModel.h/cpp # Table model for attachments
+│   ├── MsgFileModel.h/cpp # File system model filtered for .msg files
+│   └── AttachmentModel.h/cpp # Table model for attachments display
 ├── .venv/                 # Python virtual environment with extract_msg
 ├── build/                 # Build output
-└── CMakeLists.txt        # Build configuration
+├── CMakeLists.txt         # Build configuration
+├── README.md              # User documentation
+└── CONTEXT.md             # This file - development context
 ```
 
 ### Key Components
@@ -30,9 +32,10 @@ qt-msg-reader/
    - Static module loading (s_pythonInitialized, s_moduleLoaded, s_msgModule)
    - Must use `Py_InitializeEx(0)` for simpler initialization
    - GIL management with `PyGILState_Ensure()`/`PyGILState_Release()`
+   - Always call `PyErr_Clear()` after operations that may fail
 
 2. **MainWindow** - Main application window
-   - File browser (QTreeView + MsgFileModel)
+   - File browser (QTreeView + MsgFileModel) - filtered to show only .msg files
    - Message header display (subject, from, to, cc, date)
    - Body viewer (QTextEdit - supports HTML and plain text)
    - Attachments table (QTableView + AttachmentModel)
@@ -114,6 +117,9 @@ make -j$(nproc)
 ```
 
 ## Recent Changes
+- Added comprehensive comments to all methods and key code sections
+- Updated README.md with current project structure and usage
 - Added status log window with timestamped entries
 - Log shows: file loading, subject, body type/size, attachments
 - Warnings (orange) and errors (red) highlighted
+- Made header labels bold in message view

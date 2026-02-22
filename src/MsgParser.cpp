@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QRegularExpression>
 
+// Static members for Python state (shared across all MsgParser instances)
 bool MsgParser::s_pythonInitialized = false;
 bool MsgParser::s_moduleLoaded = false;
 void* MsgParser::s_msgModule = nullptr;
@@ -19,6 +20,10 @@ MsgParser::MsgParser() {
 MsgParser::~MsgParser() {
 }
 
+/**
+ * Initializes the Python interpreter and loads the extract_msg module.
+ * Uses simple Py_InitializeEx(0) to avoid config issues, then adds venv path to sys.path.
+ */
 bool MsgParser::initPython() {
     if (s_pythonInitialized) {
         return s_moduleLoaded;
@@ -27,6 +32,7 @@ bool MsgParser::initPython() {
     QString venvPath = QString(PYTHON_VENV_PATH);
     QString sitePackages = QString("%1/lib/python3.14/site-packages").arg(venvPath);
     
+    // Initialize Python with minimal config
     if (!Py_IsInitialized()) {
         Py_InitializeEx(0);
         if (!Py_IsInitialized()) {
@@ -36,6 +42,7 @@ bool MsgParser::initPython() {
         s_pythonInitialized = true;
     }
     
+    // Add venv site-packages to Python path
     PyObject* sysModule = PyImport_ImportModule("sys");
     if (sysModule) {
         PyObject* pathObj = PyObject_GetAttrString(sysModule, "path");
@@ -48,6 +55,7 @@ bool MsgParser::initPython() {
         Py_DECREF(sysModule);
     }
     
+    // Load extract_msg module
     PyObject* msgModule = PyImport_ImportModule("extract_msg");
     if (!msgModule) {
         if (PyErr_Occurred()) {
@@ -62,6 +70,10 @@ bool MsgParser::initPython() {
     return true;
 }
 
+/**
+ * Converts a Python object to QString using PyObject_Str and UTF-8 encoding.
+ * Returns empty QString if object is None or conversion fails.
+ */
 QString MsgParser::pyObjectToString(void* obj) {
     PyObject* pyObj = static_cast<PyObject*>(obj);
     if (!pyObj || pyObj == Py_None) return QString();
@@ -80,10 +92,15 @@ QString MsgParser::pyObjectToString(void* obj) {
     return result;
 }
 
+/**
+ * Converts a Python object to QByteArray.
+ * Handles bytes objects directly, or uses PyObject_Bytes for other types.
+ */
 QByteArray MsgParser::pyObjectToBytes(void* obj) {
     PyObject* pyObj = static_cast<PyObject*>(obj);
     if (!pyObj || pyObj == Py_None) return QByteArray();
     
+    // If already a bytes object, extract directly
     if (PyBytes_Check(pyObj)) {
         char* buffer;
         Py_ssize_t size;
@@ -91,6 +108,7 @@ QByteArray MsgParser::pyObjectToBytes(void* obj) {
         return QByteArray(buffer, size);
     }
     
+    // Otherwise try to convert to bytes
     PyObject* bytesObj = PyObject_Bytes(pyObj);
     if (!bytesObj) {
         PyErr_Clear();
@@ -106,10 +124,15 @@ QByteArray MsgParser::pyObjectToBytes(void* obj) {
     return result;
 }
 
+/**
+ * Converts a Python datetime object to QDateTime.
+ * Uses the timestamp() method to get Unix timestamp, then converts to Qt format.
+ */
 QDateTime MsgParser::pyObjectToDateTime(void* obj) {
     PyObject* pyObj = static_cast<PyObject*>(obj);
     if (!pyObj || pyObj == Py_None) return QDateTime();
     
+    // Try to get Unix timestamp via timestamp() method
     PyObject* timestampMethod = PyObject_GetAttrString(pyObj, "timestamp");
     if (timestampMethod) {
         PyObject* timestampObj = PyObject_CallObject(timestampMethod, nullptr);
@@ -124,6 +147,7 @@ QDateTime MsgParser::pyObjectToDateTime(void* obj) {
     }
     PyErr_Clear();
     
+    // Fallback: try to parse as ISO date string
     QString dateStr = pyObjectToString(obj);
     if (!dateStr.isEmpty()) {
         QDateTime dt = QDateTime::fromString(dateStr, Qt::ISODate);
@@ -133,6 +157,13 @@ QDateTime MsgParser::pyObjectToDateTime(void* obj) {
     return QDateTime();
 }
 
+/**
+ * Main parsing function - extracts all email data from an MSG file.
+ * Uses Python's extract_msg library via the Python C API.
+ * 
+ * CRITICAL: Always call PyErr_Clear() after operations that may fail,
+ * otherwise uncleared exceptions cause cascading failures.
+ */
 EmailMessage MsgParser::parse(const QString& filePath) {
     EmailMessage msg;
     
@@ -141,8 +172,10 @@ EmailMessage MsgParser::parse(const QString& filePath) {
         return msg;
     }
     
+    // Acquire GIL for thread safety
     PyGILState_STATE gstate = PyGILState_Ensure();
     
+    // Get Message class from extract_msg module
     PyObject* openFunc = PyObject_GetAttrString(static_cast<PyObject*>(s_msgModule), "Message");
     if (!openFunc) {
         PyErr_Print();
@@ -151,6 +184,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
         return msg;
     }
     
+    // Create Message object from file path
     PyObject* filePathPy = PyUnicode_FromString(filePath.toUtf8().constData());
     PyObject* args = PyTuple_Pack(1, filePathPy);
     
@@ -168,14 +202,17 @@ EmailMessage MsgParser::parse(const QString& filePath) {
     
     msg.isValid = true;
     
+    // Extract subject
     PyObject* subjectObj = PyObject_GetAttrString(msgObj, "subject");
     msg.subject = pyObjectToString(subjectObj);
     Py_XDECREF(subjectObj);
     
+    // Extract plain text body
     PyObject* bodyObj = PyObject_GetAttrString(msgObj, "body");
     msg.bodyPlainText = pyObjectToString(bodyObj);
     Py_XDECREF(bodyObj);
     
+    // Extract HTML body (returned as bytes)
     PyObject* htmlBodyObj = PyObject_GetAttrString(msgObj, "htmlBody");
     if (htmlBodyObj && htmlBodyObj != Py_None) {
         QByteArray htmlBytes = pyObjectToBytes(htmlBodyObj);
@@ -186,11 +223,13 @@ EmailMessage MsgParser::parse(const QString& filePath) {
     Py_XDECREF(htmlBodyObj);
     PyErr_Clear();
     
+    // Extract sender info (sender is string like "Name <email@example.com>")
     PyObject* senderObj = PyObject_GetAttrString(msgObj, "sender");
     msg.senderName = pyObjectToString(senderObj);
     Py_XDECREF(senderObj);
     PyErr_Clear();
     
+    // Parse email from sender string using regex
     if (!msg.senderName.isEmpty()) {
         QRegularExpression emailRe(R"((?:<|^)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?:>|$))");
         QRegularExpressionMatch match = emailRe.match(msg.senderName);
@@ -205,10 +244,13 @@ EmailMessage MsgParser::parse(const QString& filePath) {
         }
     }
     
+    // Extract date
     PyObject* dateObj = PyObject_GetAttrString(msgObj, "date");
     msg.date = pyObjectToDateTime(dateObj);
     Py_XDECREF(dateObj);
     
+    // Extract recipients from msg.recipients list
+    // recipient.type: 1=TO, 2=CC
     PyObject* recipientsObj = PyObject_GetAttrString(msgObj, "recipients");
     if (recipientsObj && PyList_Check(recipientsObj)) {
         Py_ssize_t len = PyList_Size(recipientsObj);
@@ -242,6 +284,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
     Py_XDECREF(recipientsObj);
     PyErr_Clear();
     
+    // Fallback: use msg.to and msg.cc strings directly if recipients list is empty
     if (msg.toRecipients.isEmpty()) {
         PyObject* toObj = PyObject_GetAttrString(msgObj, "to");
         if (toObj && toObj != Py_None) {
@@ -264,6 +307,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
         PyErr_Clear();
     }
     
+    // Extract attachments (list of Attachment objects)
     PyObject* attachmentsObj = PyObject_GetAttrString(msgObj, "attachments");
     if (attachmentsObj && PyList_Check(attachmentsObj)) {
         Py_ssize_t len = PyList_Size(attachmentsObj);
@@ -271,6 +315,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
             PyObject* value = PyList_GetItem(attachmentsObj, i);
             EmailAttachment att;
             
+            // Try longFilename first, then shortFilename, then name
             PyObject* filenameObj = PyObject_GetAttrString(value, "longFilename");
             if (!filenameObj || filenameObj == Py_None) {
                 Py_XDECREF(filenameObj);
@@ -293,6 +338,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
             Py_XDECREF(mimeObj);
             PyErr_Clear();
             
+            // data can be a method or a property - try calling as method first
             PyObject* dataMethod = PyObject_GetAttrString(value, "data");
             if (dataMethod && PyCallable_Check(dataMethod)) {
                 PyObject* dataObj = PyObject_CallObject(dataMethod, nullptr);
@@ -305,6 +351,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
             Py_XDECREF(dataMethod);
             PyErr_Clear();
             
+            // If data is still empty, try as property
             if (att.data.isEmpty()) {
                 PyObject* dataObj = PyObject_GetAttrString(value, "data");
                 if (dataObj && dataObj != Py_None) {
@@ -321,6 +368,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
     Py_XDECREF(attachmentsObj);
     PyErr_Clear();
     
+    // Close the MSG file to release resources
     PyObject* closeMethod = PyObject_GetAttrString(msgObj, "close");
     if (closeMethod && PyCallable_Check(closeMethod)) {
         PyObject_CallObject(closeMethod, nullptr);

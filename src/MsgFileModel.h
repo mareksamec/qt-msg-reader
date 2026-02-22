@@ -3,6 +3,10 @@
 
 #include <QFileSystemModel>
 
+/**
+ * File system model filtered to show only MSG files.
+ * Used by the file browser tree view to navigate to MSG files.
+ */
 class MsgFileModel : public QFileSystemModel {
     Q_OBJECT
     

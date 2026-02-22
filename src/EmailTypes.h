@@ -6,6 +6,9 @@
 #include <QDateTime>
 #include <QList>
 
+/**
+ * Represents a single email attachment with its metadata and binary content.
+ */
 struct EmailAttachment {
     QString filename;
     QString mimeType;
@@ -13,6 +16,10 @@ struct EmailAttachment {
     qint64 size;
 };
 
+/**
+ * Represents a parsed email message with all its properties.
+ * isValid indicates whether parsing was successful; errorMessage contains error details if not.
+ */
 struct EmailMessage {
     QString subject;
     QString bodyPlainText;
