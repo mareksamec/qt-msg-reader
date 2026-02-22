@@ -72,11 +72,19 @@ jobs:
         mkdir -p ${{ steps.strings.outputs.build-output-dir }}/python-packages
         cp -r ${{ env.pythonLocation }}/lib/python3.13/site-packages/* ${{ steps.strings.outputs.build-output-dir }}/python-packages/
 
+    # - name: Copy Python packages (Windows)
+    #   if: runner.os == 'Windows'
+    #   run: |
+    #     mkdir ${{ steps.strings.outputs.build-output-dir }}/python-packages
+    #     xcopy "${{ env.pythonLocation }}\Lib\site-packages\*" "${{ steps.strings.outputs.build-output-dir }}\python-packages\" /E /I
+
     - name: Copy Python packages (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: |
-        mkdir ${{ steps.strings.outputs.build-output-dir }}/python-packages
-        xcopy "${{ env.pythonLocation }}\Lib\site-packages\*" "${{ steps.strings.outputs.build-output-dir }}\python-packages\" /E /I
+        $dest = "${{ steps.strings.outputs.build-output-dir }}\python-packages"
+        New-Item -ItemType Directory -Force -Path $dest
+        Copy-Item -Path "${{ env.pythonLocation }}\Lib\site-packages\*" -Destination $dest -Recurse -Force
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
