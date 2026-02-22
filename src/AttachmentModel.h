@@ -5,6 +5,10 @@
 #include <QList>
 #include "EmailTypes.h"
 
+/**
+ * Qt table model for displaying email attachments.
+ * Provides filename and size columns for the attachments table view.
+ */
 class AttachmentModel : public QAbstractTableModel {
     Q_OBJECT
     
@@ -17,7 +21,9 @@ public:
     
     explicit AttachmentModel(QObject* parent = nullptr);
     
+    /** Replaces the current attachments with a new list. */
     void setAttachments(const QList<EmailAttachment>& attachments);
+    /** Returns the attachment at the given row. */
     const EmailAttachment& attachment(int row) const;
     
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;

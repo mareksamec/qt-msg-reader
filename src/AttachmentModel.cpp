@@ -36,6 +36,7 @@ QVariant AttachmentModel::data(const QModelIndex& index, int role) const {
             case ColumnFilename:
                 return att.filename;
             case ColumnSize: {
+                // Format size in human-readable format
                 if (att.size < 1024)
                     return QString("%1 B").arg(att.size);
                 else if (att.size < 1024 * 1024)

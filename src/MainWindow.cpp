@@ -27,6 +27,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow() = default;
 
 void MainWindow::setupMenus() {
+    // Create File menu
     QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
     
     QAction* openAction = fileMenu->addAction(tr("&Open..."));
@@ -39,6 +40,7 @@ void MainWindow::setupMenus() {
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
     
+    // Create Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
     QAction* aboutAction = helpMenu->addAction(tr("&About"));
     connect(aboutAction, &QAction::triggered, [this]() {
@@ -48,9 +50,11 @@ void MainWindow::setupMenus() {
 }
 
 void MainWindow::setupUi() {
+    // Main horizontal splitter: file browser | content area
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(m_mainSplitter);
     
+    // File browser panel
     m_fileBrowser = new QTreeView(m_mainSplitter);
     m_fileBrowser->setModel(m_fileModel);
     QModelIndex rootIndex = m_fileModel->setRootPath(QDir::homePath());
@@ -62,12 +66,15 @@ void MainWindow::setupUi() {
     m_fileBrowser->setAlternatingRowColors(true);
     connect(m_fileBrowser, &QTreeView::doubleClicked, this, &MainWindow::onFileDoubleClicked);
     
+    // Vertical splitter for message content
     m_contentSplitter = new QSplitter(Qt::Vertical, m_mainSplitter);
     
+    // Message panel with header and body
     m_messagePanel = new QWidget(m_contentSplitter);
     QVBoxLayout* messageLayout = new QVBoxLayout(m_messagePanel);
     messageLayout->setContentsMargins(8, 8, 8, 8);
     
+    // Header section with labels
     QGroupBox* headerGroup = new QGroupBox(tr("Message Header"), m_messagePanel);
     QGridLayout* headerLayout = new QGridLayout(headerGroup);
     
@@ -108,6 +115,7 @@ void MainWindow::setupUi() {
     headerLayout->setColumnStretch(1, 1);
     messageLayout->addWidget(headerGroup);
     
+    // Body section
     QGroupBox* bodyGroup = new QGroupBox(tr("Message Body"), m_messagePanel);
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyGroup);
     
@@ -119,6 +127,7 @@ void MainWindow::setupUi() {
     
     m_contentSplitter->addWidget(m_messagePanel);
     
+    // Attachments section
     QGroupBox* attachmentGroup = new QGroupBox(tr("Attachments"), m_contentSplitter);
     QVBoxLayout* attachmentLayout = new QVBoxLayout(attachmentGroup);
     
@@ -135,6 +144,7 @@ void MainWindow::setupUi() {
     
     m_contentSplitter->addWidget(attachmentGroup);
     
+    // Status log section
     QGroupBox* statusGroup = new QGroupBox(tr("Status Log"), m_contentSplitter);
     QVBoxLayout* statusLayout = new QVBoxLayout(statusGroup);
     
@@ -172,9 +182,11 @@ void MainWindow::loadFile(const QString& filePath) {
 }
 
 void MainWindow::updateMessageView(const EmailMessage& msg) {
+    // Update subject
     m_subjectLabel->setText(msg.subject.isEmpty() ? tr("(no subject)") : msg.subject);
     log(tr("Subject: %1").arg(msg.subject.isEmpty() ? tr("(no subject)") : msg.subject));
     
+    // Format sender display
     QString fromText;
     if (!msg.senderName.isEmpty() && !msg.senderEmail.isEmpty()) {
         fromText = QString("%1 <%2>").arg(msg.senderName, msg.senderEmail);
@@ -187,15 +199,18 @@ void MainWindow::updateMessageView(const EmailMessage& msg) {
     }
     m_fromLabel->setText(fromText);
     
+    // Update recipients
     m_toLabel->setText(msg.toRecipients.isEmpty() ? tr("(no recipients)") : msg.toRecipients);
     m_ccLabel->setText(msg.ccRecipients.isEmpty() ? tr("-") : msg.ccRecipients);
     
+    // Update date
     if (msg.date.isValid()) {
         m_dateLabel->setText(msg.date.toLocalTime().toString(Qt::ISODate));
     } else {
         m_dateLabel->setText(tr("(unknown date)"));
     }
     
+    // Update body - prefer HTML over plain text
     QString bodyText = msg.bodyHtml.isEmpty() ? msg.bodyPlainText : msg.bodyHtml;
     bodyText.remove('\0');
     
@@ -210,6 +225,7 @@ void MainWindow::updateMessageView(const EmailMessage& msg) {
         logWarning(tr("No message body found"));
     }
     
+    // Update attachments
     m_attachmentModel->setAttachments(msg.attachments);
     
     if (msg.attachments.isEmpty()) {
