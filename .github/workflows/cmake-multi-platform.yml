@@ -124,7 +124,8 @@ jobs:
 
     - name: Create source tarball
       run: |
-        tar -czvf source.tar.gz --exclude='.git' --exclude='build' --exclude='.venv' .
+        mkdir -p release
+        tar -czvf release/source.tar.gz --exclude='.git' --exclude='build' --exclude='.venv' --exclude='artifacts' .
 
     - name: Move artifacts to release directory
       run: |
