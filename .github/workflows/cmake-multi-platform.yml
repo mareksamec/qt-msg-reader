@@ -93,9 +93,14 @@ jobs:
 
     - name: Create archive (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: |
-        cd ${{ steps.strings.outputs.build-output-dir }}
-        Compress-Archive -Path qt-msg-reader.exe,python-packages -DestinationPath qt-msg-reader-windows-x86_64.zip
+        $buildDir = "${{ steps.strings.outputs.build-output-dir }}"
+        $exePath = Join-Path $buildDir "Release\qt-msg-reader.exe"
+        if (Test-Path $exePath) {
+            Move-Item $exePath $buildDir
+        }
+        Compress-Archive -Path "$buildDir\qt-msg-reader.exe", "$buildDir\python-packages" -DestinationPath "$buildDir\qt-msg-reader-windows-x86_64.zip"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
