@@ -145,7 +145,30 @@ Key steps:
 4. Copies Python packages to build output
 5. Uploads artifacts (executable + python-packages)
 
+### Manual Releases
+
+To create a release:
+1. Go to Actions → Build workflow
+2. Click "Run workflow"
+3. Enter version (e.g., `v1.0.0`)
+4. The workflow will create a GitHub Release with:
+   - Linux binary (`qt-msg-reader-linux-x86_64.tar.gz`)
+   - Windows binary (`qt-msg-reader-windows-x86_64.zip`)
+   - Source tarball (`source.tar.gz`)
+
+## Arch Linux Package
+
+A `PKGBUILD` file is provided for Arch Linux users. It uses `python-extract-msg` from the official repositories.
+
+To install on Arch Linux:
+```bash
+makepkg -si
+```
+
 ## Recent Changes
+- Added PKGBUILD for Arch Linux packaging
+- Added manual release workflow with version input
+- Releases include Linux/Windows binaries + source tarball
 - Added GitHub Actions CI workflow for Linux and Windows
 - Made Python version detection flexible (supports 3.13, 3.14, etc.)
 - Bundled Python packages with the executable for deployment

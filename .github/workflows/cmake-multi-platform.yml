@@ -5,6 +5,12 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
 
 jobs:
   build:
@@ -28,7 +34,6 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         version: '6.8.0'
-        # modules: 'qtwidgets'
 
     - uses: actions/setup-python@v5
       with:
@@ -72,12 +77,6 @@ jobs:
         mkdir -p ${{ steps.strings.outputs.build-output-dir }}/python-packages
         cp -r ${{ env.pythonLocation }}/lib/python3.13/site-packages/* ${{ steps.strings.outputs.build-output-dir }}/python-packages/
 
-    # - name: Copy Python packages (Windows)
-    #   if: runner.os == 'Windows'
-    #   run: |
-    #     mkdir ${{ steps.strings.outputs.build-output-dir }}/python-packages
-    #     xcopy "${{ env.pythonLocation }}\Lib\site-packages\*" "${{ steps.strings.outputs.build-output-dir }}\python-packages\" /E /I
-
     - name: Copy Python packages (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
@@ -86,10 +85,56 @@ jobs:
         New-Item -ItemType Directory -Force -Path $dest
         Copy-Item -Path "${{ env.pythonLocation }}\Lib\site-packages\*" -Destination $dest -Recurse -Force
 
+    - name: Create archive (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        cd ${{ steps.strings.outputs.build-output-dir }}
+        tar -czvf qt-msg-reader-linux-x86_64.tar.gz qt-msg-reader python-packages
+
+    - name: Create archive (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd ${{ steps.strings.outputs.build-output-dir }}
+        Compress-Archive -Path qt-msg-reader.exe,python-packages -DestinationPath qt-msg-reader-windows-x86_64.zip
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: qt-msg-reader-${{ matrix.os }}
         path: |
-          ${{ steps.strings.outputs.build-output-dir }}/qt-msg-reader*
-          ${{ steps.strings.outputs.build-output-dir }}/python-packages
+          ${{ steps.strings.outputs.build-output-dir }}/qt-msg-reader-*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create source tarball
+      run: |
+        tar -czvf source.tar.gz --exclude='.git' --exclude='build' --exclude='.venv' .
+
+    - name: Move artifacts to release directory
+      run: |
+        mkdir -p release
+        mv artifacts/qt-msg-reader-ubuntu-latest/*.tar.gz release/
+        mv artifacts/qt-msg-reader-windows-latest/*.zip release/
+        mv source.tar.gz release/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ inputs.version }}
+        name: Release ${{ inputs.version }}
+        draft: false
+        prerelease: false
+        files: release/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
