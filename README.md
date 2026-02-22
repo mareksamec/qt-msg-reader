@@ -94,6 +94,13 @@ qt-msg-reader/
 └── resources/
     └── icons/               # Application icons
 ```
+## TODO
+- [ ] Re-write MsgParser to clean C or C++ to avoid Python dependency msg-extract
+- [ ] Improve build system add Releases
+- [ ] Remove Windows support - not needed as you can use Outlook on Win.
+
+## Notes
+Fun little project built with agentic coding, I'm open to MR but I might not have time to review everything.
 
 ## License
 

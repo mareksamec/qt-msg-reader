@@ -132,7 +132,6 @@ jobs:
         mkdir -p release
         mv artifacts/qt-msg-reader-ubuntu-latest/*.tar.gz release/
         mv artifacts/qt-msg-reader-windows-latest/*.zip release/
-        mv source.tar.gz release/
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
