@@ -34,23 +34,34 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Define paths for Python packages
+# PYTHON_SITE_PACKAGES can be set externally (e.g., in CI) to override the default venv path
 set(PYTHON_VENV_PATH "${CMAKE_CURRENT_SOURCE_DIR}/.venv")
 set(PYTHON_PACKAGES_DIR "python-packages")
+
+# Detect Python version for path construction
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')"
+    OUTPUT_VARIABLE PYTHON_VERSION_STRING
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     PYTHON_VENV_PATH="${PYTHON_VENV_PATH}"
     PYTHON_PACKAGES_DIR="${PYTHON_PACKAGES_DIR}"
+    PYTHON_VERSION_STRING="${PYTHON_VERSION_STRING}"
 )
 
-# Copy Python packages to build directory for development
-add_custom_command(
-    TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
-        "${PYTHON_VENV_PATH}/lib/python3.14/site-packages"
-        "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
-    COMMENT "Copying Python packages to build directory"
-)
+# Copy Python packages to build directory for development (only if venv exists)
+if(EXISTS "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages")
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory 
+            "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages"
+            "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
+        COMMENT "Copying Python packages to build directory"
+    )
+endif()
 
 # Install target with bundled Python packages
 install(TARGETS ${PROJECT_NAME}
@@ -58,8 +69,10 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY "${PYTHON_VENV_PATH}/lib/python3.14/site-packages/"
-    DESTINATION ${PYTHON_PACKAGES_DIR}
-    PATTERN "*.pyc" EXCLUDE
-    PATTERN "__pycache__" EXCLUDE
-)
+if(EXISTS "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages")
+    install(DIRECTORY "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages/"
+        DESTINATION ${PYTHON_PACKAGES_DIR}
+        PATTERN "*.pyc" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
+    )
+endif()

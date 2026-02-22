@@ -120,17 +120,57 @@ make -j$(nproc)
 
 The application bundles Python packages for deployment:
 
-**Development:** Uses `.venv/lib/python3.14/site-packages` from the source directory
+**Development:** Uses `.venv/lib/<python-version>/site-packages` from the source directory
 
 **Deployment:** Bundles `python-packages/` directory next to the executable
 
+**CI (GitHub Actions):** Uses system Python packages, copied to `python-packages/` by workflow
+
 The `MsgParser::findSitePackages()` method searches in this order:
 1. `<exe_dir>/python-packages/` (bundled, for deployment)
-2. `.venv/lib/python3.14/site-packages` (development)
+2. `.venv/lib/<python-version>/site-packages` (development)
 
-CMake automatically copies packages from `.venv` to `build/python-packages/` during build.
+CMake detects the Python version automatically and copies packages from `.venv` to `build/python-packages/` during build.
+
+## GitHub Actions CI
+
+The workflow (`.github/workflows/cmake-multi-platform.yml`) builds for:
+- **ubuntu-latest** (GCC)
+- **windows-latest** (MSVC)
+
+Key steps:
+1. Installs Qt6 via `jurplel/install-qt-action`
+2. Sets up Python 3.13 and installs `extract_msg`
+3. Builds the application
+4. Copies Python packages to build output
+5. Uploads artifacts (executable + python-packages)
+
+### Manual Releases
+
+To create a release:
+1. Go to Actions → Build workflow
+2. Click "Run workflow"
+3. Enter version (e.g., `v1.0.0`)
+4. The workflow will create a GitHub Release with:
+   - Linux binary (`qt-msg-reader-linux-x86_64.tar.gz`)
+   - Windows binary (`qt-msg-reader-windows-x86_64.zip`)
+   - Source tarball (`source.tar.gz`)
+
+## Arch Linux Package
+
+A `PKGBUILD` file is provided for Arch Linux users. It uses `python-extract-msg` from the official repositories.
+
+To install on Arch Linux:
+```bash
+makepkg -si
+```
 
 ## Recent Changes
+- Added PKGBUILD for Arch Linux packaging
+- Added manual release workflow with version input
+- Releases include Linux/Windows binaries + source tarball
+- Added GitHub Actions CI workflow for Linux and Windows
+- Made Python version detection flexible (supports 3.13, 3.14, etc.)
 - Bundled Python packages with the executable for deployment
 - Added `findSitePackages()` to locate packages (bundled or venv)
 - CMake copies site-packages to build directory

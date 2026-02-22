@@ -37,9 +37,9 @@ QString MsgParser::findSitePackages() {
         return bundledPath;
     }
     
-    // Option 2: Development venv
+    // Option 2: Development venv (using detected Python version)
     QString venvPath = QString(PYTHON_VENV_PATH);
-    QString venvSitePackages = QString("%1/lib/python3.14/site-packages").arg(venvPath);
+    QString venvSitePackages = QString("%1/lib/%2/site-packages").arg(venvPath, PYTHON_VERSION_STRING);
     QDir venvDir(venvSitePackages);
     if (venvDir.exists("extract_msg")) {
         qDebug() << "Using venv Python packages:" << venvSitePackages;
@@ -47,6 +47,7 @@ QString MsgParser::findSitePackages() {
     }
     
     qWarning() << "Could not find extract_msg module";
+    qWarning() << "Searched:" << bundledPath << "and" << venvSitePackages;
     return QString();
 }
 
