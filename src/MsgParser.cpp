@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QDateTime>
 #include <QRegularExpression>
+#include <QCoreApplication>
 
 // Static members for Python state (shared across all MsgParser instances)
 bool MsgParser::s_pythonInitialized = false;
@@ -21,16 +22,48 @@ MsgParser::~MsgParser() {
 }
 
 /**
+ * Finds the Python packages directory.
+ * Priority:
+ * 1. Bundled python-packages next to executable (for deployment)
+ * 2. .venv in source directory (for development)
+ */
+QString MsgParser::findSitePackages() {
+    // Option 1: Bundled packages next to executable
+    QString exeDir = QCoreApplication::applicationDirPath();
+    QString bundledPath = QString("%1/%2").arg(exeDir, PYTHON_PACKAGES_DIR);
+    QDir bundledDir(bundledPath);
+    if (bundledDir.exists("extract_msg")) {
+        qDebug() << "Using bundled Python packages:" << bundledPath;
+        return bundledPath;
+    }
+    
+    // Option 2: Development venv
+    QString venvPath = QString(PYTHON_VENV_PATH);
+    QString venvSitePackages = QString("%1/lib/python3.14/site-packages").arg(venvPath);
+    QDir venvDir(venvSitePackages);
+    if (venvDir.exists("extract_msg")) {
+        qDebug() << "Using venv Python packages:" << venvSitePackages;
+        return venvSitePackages;
+    }
+    
+    qWarning() << "Could not find extract_msg module";
+    return QString();
+}
+
+/**
  * Initializes the Python interpreter and loads the extract_msg module.
- * Uses simple Py_InitializeEx(0) to avoid config issues, then adds venv path to sys.path.
+ * Uses simple Py_InitializeEx(0) to avoid config issues, then adds site-packages to sys.path.
  */
 bool MsgParser::initPython() {
     if (s_pythonInitialized) {
         return s_moduleLoaded;
     }
     
-    QString venvPath = QString(PYTHON_VENV_PATH);
-    QString sitePackages = QString("%1/lib/python3.14/site-packages").arg(venvPath);
+    QString sitePackages = findSitePackages();
+    if (sitePackages.isEmpty()) {
+        qWarning() << "No Python packages found";
+        return false;
+    }
     
     // Initialize Python with minimal config
     if (!Py_IsInitialized()) {
@@ -42,7 +75,7 @@ bool MsgParser::initPython() {
         s_pythonInitialized = true;
     }
     
-    // Add venv site-packages to Python path
+    // Add site-packages to Python path
     PyObject* sysModule = PyImport_ImportModule("sys");
     if (sysModule) {
         PyObject* pathObj = PyObject_GetAttrString(sysModule, "path");

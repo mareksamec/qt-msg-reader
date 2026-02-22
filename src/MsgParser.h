@@ -16,6 +16,8 @@ public:
     EmailMessage parse(const QString& filePath);
     
 private:
+    /** Finds the Python site-packages directory (bundled or venv). */
+    QString findSitePackages();
     /** Initializes Python interpreter and loads extract_msg module. */
     bool initPython();
     /** Converts a Python object to QString. */

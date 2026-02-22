@@ -33,8 +33,7 @@ The application is built with:
 ## Dependencies
 
 - **Qt 6.x** - GUI framework (Qt::Widgets, Qt::Core)
-- **Python 3.14** - For extract_msg library
-- **extract_msg** - Python library for parsing MSG files
+- **Python 3.14** - For extract_msg library (system Python is used, packages are bundled)
 - **CMake 3.16+** - Build system
 - **C++17** - Language standard
 
@@ -45,6 +44,16 @@ mkdir build && cd build
 cmake ..
 make -j$(nproc)
 ```
+
+The build process automatically copies Python packages (including extract_msg) to `build/python-packages/`.
+
+## Deployment
+
+The application can be deployed by copying:
+- `qt-msg-reader` executable
+- `python-packages/` directory (next to the executable)
+
+No Python installation is required on the target system.
 
 ## Running
 
@@ -78,8 +87,10 @@ qt-msg-reader/
 │   ├── EmailTypes.h         # Data structures
 │   ├── MsgFileModel.h/cpp   # File browser model
 │   └── AttachmentModel.h/cpp # Attachment table model
-├── .venv/                   # Python virtual environment
-├── build/                   # Build output
+├── .venv/                   # Python virtual environment (development)
+├── build/
+│   ├── qt-msg-reader        # Executable
+│   └── python-packages/     # Bundled Python packages (deployment)
 └── resources/
     └── icons/               # Application icons
 ```
