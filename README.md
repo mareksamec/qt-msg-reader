@@ -112,7 +112,25 @@ qt-msg-reader/
   - [Usage](#usage)
   - [Project Structure](#project-structure)
   - [TODO](#todo)
+  - [Table of Contents](#table-of-contents-1)
   - [Table of Contents](#table-of-contents)
+  - [License](#license)
+
+## Table of Contents
+
+- [Qt MSG Reader](#qt-msg-reader)
+  - [Overview](#overview)
+  - [Architecture](#architecture)
+    - [Key Components](#key-components)
+  - [Dependencies](#dependencies)
+  - [Building](#building)
+  - [Deployment](#deployment)
+  - [Running](#running)
+  - [Usage](#usage)
+  - [Project Structure](#project-structure)
+  - [TODO](#todo)
+  - [Table of Contents](#table-of-contents)
+  - [Table of Contents](#table-of-contents-1)
   - [License](#license)
 
 Fun little project built with agentic coding, I'm open to MR but I might not have time to review everything.
