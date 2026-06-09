@@ -34,9 +34,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Define paths for Python packages
-# PYTHON_SITE_PACKAGES can be set externally (e.g., in CI) to override the default venv path
-set(PYTHON_VENV_PATH "${CMAKE_CURRENT_SOURCE_DIR}/.venv")
 set(PYTHON_PACKAGES_DIR "python-packages")
+set(PYTHON_PRIVATE_PACKAGES_PATH "${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/${PYTHON_PACKAGES_DIR}")
 
 # Detect Python version for path construction
 execute_process(
@@ -46,33 +45,25 @@ execute_process(
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    PYTHON_VENV_PATH="${PYTHON_VENV_PATH}"
     PYTHON_PACKAGES_DIR="${PYTHON_PACKAGES_DIR}"
+    PYTHON_PRIVATE_PACKAGES_PATH="${PYTHON_PRIVATE_PACKAGES_PATH}"
     PYTHON_VERSION_STRING="${PYTHON_VERSION_STRING}"
 )
 
-# Copy Python packages to build directory for development (only if venv exists)
-if(EXISTS "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages")
-    add_custom_command(
-        TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory 
-            "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages"
-            "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}"
-        COMMENT "Copying Python packages to build directory"
-    )
-endif()
-
-# Install target with bundled Python packages
 install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
 )
 
-if(EXISTS "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages")
-    install(DIRECTORY "${PYTHON_VENV_PATH}/lib/${PYTHON_VERSION_STRING}/site-packages/"
-        DESTINATION ${PYTHON_PACKAGES_DIR}
-        PATTERN "*.pyc" EXCLUDE
-        PATTERN "__pycache__" EXCLUDE
+install(DIRECTORY DESTINATION "lib/${PROJECT_NAME}/${PYTHON_PACKAGES_DIR}")
+
+# Option to install private Python packages during build
+option(INSTALL_PYTHON_DEPS "Install extract_msg and all dependencies to build directory" OFF)
+if(INSTALL_PYTHON_DEPS)
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${Python3_EXECUTABLE} -m pip install --target
+            "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}" extract_msg
+        COMMENT "Installing Python packages to build directory"
     )
 endif()

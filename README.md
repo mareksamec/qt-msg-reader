@@ -33,7 +33,7 @@ The application is built with:
 ## Dependencies
 
 - **Qt 6.x** - GUI framework (Qt::Widgets, Qt::Core)
-- **Python 3.14** - For extract_msg library (system Python is used, packages are bundled)
+- **Python 3.x** - Required at runtime (uses Python C API)
 - **CMake 3.16+** - Build system
 - **C++17** - Language standard
 
@@ -45,15 +45,14 @@ cmake ..
 make -j$(nproc)
 ```
 
-The build process automatically copies Python packages (including extract_msg) to `build/python-packages/`.
-
 ## Deployment
 
-The application can be deployed by copying:
-- `qt-msg-reader` executable
-- `python-packages/` directory (next to the executable)
+The application requires Python installed on the target system. The `extract_msg` library and its non-system dependencies are installed to a private path (`/usr/lib/qt-msg-reader/python-packages/`) to avoid conflicts with user packages.
 
-No Python installation is required on the target system.
+On Arch Linux:
+```bash
+makepkg -si  # uses the provided PKGBUILD
+```
 
 ## Running
 
@@ -80,6 +79,7 @@ qt-msg-reader/
 ├── CMakeLists.txt           # Build configuration
 ├── README.md                # This file
 ├── CONTEXT.md               # Development context and notes
+├── PKGBUILD                 # Arch Linux package build
 ├── src/
 │   ├── main.cpp             # Application entry point
 │   ├── MainWindow.h/cpp     # Main window UI
@@ -87,12 +87,8 @@ qt-msg-reader/
 │   ├── EmailTypes.h         # Data structures
 │   ├── MsgFileModel.h/cpp   # File browser model
 │   └── AttachmentModel.h/cpp # Attachment table model
-├── .venv/                   # Python virtual environment (development)
-├── build/
-│   ├── qt-msg-reader        # Executable
-│   └── python-packages/     # Bundled Python packages (deployment)
-└── resources/
-    └── icons/               # Application icons
+└── build/
+    └── qt-msg-reader        # Executable
 ```
 ## TODO
 - [ ] Re-write MsgParser to clean C or C++ to avoid Python dependency msg-extract
