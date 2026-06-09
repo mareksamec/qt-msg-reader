@@ -54,17 +54,31 @@ void MainWindow::setupUi() {
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(m_mainSplitter);
     
-    // File browser panel
-    m_fileBrowser = new QTreeView(m_mainSplitter);
+    // File browser panel with path edit
+    QWidget* browserPanel = new QWidget(m_mainSplitter);
+    QVBoxLayout* browserLayout = new QVBoxLayout(browserPanel);
+    browserLayout->setContentsMargins(0, 0, 0, 0);
+    browserLayout->setSpacing(2);
+
+    m_pathEdit = new QLineEdit(browserPanel);
+    m_pathEdit->setPlaceholderText(tr("Enter file path..."));
+    connect(m_pathEdit, &QLineEdit::returnPressed, this, &MainWindow::onPathEntered);
+    browserLayout->addWidget(m_pathEdit);
+
+    m_fileBrowser = new QTreeView(browserPanel);
     m_fileBrowser->setModel(m_fileModel);
     QModelIndex rootIndex = m_fileModel->setRootPath(QDir::homePath());
     m_fileBrowser->setRootIndex(rootIndex);
-    m_fileBrowser->setWindowTitle(tr("File Browser"));
     m_fileBrowser->setMinimumWidth(200);
     m_fileBrowser->setSortingEnabled(true);
     m_fileBrowser->sortByColumn(0, Qt::AscendingOrder);
     m_fileBrowser->setAlternatingRowColors(true);
     connect(m_fileBrowser, &QTreeView::doubleClicked, this, &MainWindow::onFileDoubleClicked);
+    connect(m_fileBrowser, &QTreeView::clicked, this, [this](const QModelIndex& index) {
+        QString path = m_fileModel->filePath(index);
+        m_pathEdit->setText(QFileInfo(path).isDir() ? path : QFileInfo(path).absolutePath());
+    });
+    browserLayout->addWidget(m_fileBrowser);
     
     // Vertical splitter for message content
     m_contentSplitter = new QSplitter(Qt::Vertical, m_mainSplitter);
@@ -175,6 +189,7 @@ void MainWindow::loadFile(const QString& filePath) {
     
     m_currentFile = filePath;
     m_currentMessage = msg;
+    m_pathEdit->setText(filePath);
     updateMessageView(msg);
     
     setWindowTitle(tr("Qt MSG Reader - %1").arg(QFileInfo(filePath).fileName()));
@@ -279,6 +294,21 @@ void MainWindow::onFileDoubleClicked(const QModelIndex& index) {
     
     if (filePath.endsWith(".msg", Qt::CaseInsensitive)) {
         loadFile(filePath);
+    }
+}
+
+void MainWindow::onPathEntered() {
+    QString path = m_pathEdit->text().trimmed();
+    if (path.isEmpty()) return;
+
+    QFileInfo info(path);
+    if (info.isFile() && path.endsWith(".msg", Qt::CaseInsensitive)) {
+        loadFile(info.absoluteFilePath());
+    } else if (info.isDir()) {
+        QModelIndex idx = m_fileModel->setRootPath(info.absoluteFilePath());
+        m_fileBrowser->setRootIndex(idx);
+    } else {
+        logWarning(tr("Invalid path: %1").arg(path));
     }
 }
 

@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QTreeView>
 #include <QTextEdit>
+#include <QLineEdit>
 #include <QLabel>
 #include <QTableView>
 #include <QSplitter>
@@ -34,6 +35,8 @@ private slots:
     void onFileDoubleClicked(const QModelIndex& index);
     /** Handles double-click on an attachment to save it. */
     void onAttachmentDoubleClicked(const QModelIndex& index);
+    /** Handles path entered in the file path line edit. */
+    void onPathEntered();
     
 private:
     /** Sets up the UI layout and widgets. */
@@ -54,6 +57,7 @@ private:
     
     QTreeView* m_fileBrowser;
     MsgFileModel* m_fileModel;
+    QLineEdit* m_pathEdit;
     
     QWidget* m_messagePanel;
     QLabel* m_subjectLabel;
