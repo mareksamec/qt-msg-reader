@@ -18,8 +18,8 @@ qt-msg-reader/
 │   ├── EmailTypes.h       # Data structures (EmailMessage, EmailAttachment)
 │   ├── MsgFileModel.h/cpp # File system model filtered for .msg files
 │   └── AttachmentModel.h/cpp # Table model for attachments display
-├── .venv/                 # Python virtual environment with extract_msg
 ├── build/                 # Build output
+├── PKGBUILD               # Arch Linux package build
 ├── CMakeLists.txt         # Build configuration
 ├── README.md              # User documentation
 └── CONTEXT.md             # This file - development context
@@ -118,19 +118,20 @@ make -j$(nproc)
 
 ## Python Packages
 
-The application bundles Python packages for deployment:
+The application installs `extract_msg` and its non-system dependencies to a private path to avoid conflicts with user packages.
 
-**Development:** Uses `.venv/lib/<python-version>/site-packages` from the source directory
+**Install path:** `/usr/lib/qt-msg-reader/python-packages/`
 
-**Deployment:** Bundles `python-packages/` directory next to the executable
+**System dependencies** (listed in PKGBUILD `depends=()`): beautifulsoup4, olefile, lark-parser, pyparsing
 
-**CI (GitHub Actions):** Uses system Python packages, copied to `python-packages/` by workflow
+**Vendored packages** (installed to private path): extract_msg, compressed-rtf, ebcdic, RTFDE, red-black-tree-mod, oletools, pcodedmp, msoffcrypto-tool
+
+**CI (GitHub Actions):** Bundles `python-packages/` directory next to the executable
 
 The `MsgParser::findSitePackages()` method searches in this order:
-1. `<exe_dir>/python-packages/` (bundled, for deployment)
-2. `.venv/lib/<python-version>/site-packages` (development)
-
-CMake detects the Python version automatically and copies packages from `.venv` to `build/python-packages/` during build.
+1. `/usr/lib/qt-msg-reader/python-packages/` (private install, normal usage)
+2. `<exe_dir>/python-packages/` (bundled, for CI/deployment)
+3. `/usr/lib/<python-version>/site-packages` (system fallback)
 
 ## GitHub Actions CI
 
@@ -158,7 +159,7 @@ To create a release:
 
 ## Arch Linux Package
 
-A `PKGBUILD` file is provided for Arch Linux users. It uses `python-extract-msg` from the official repositories.
+A `PKGBUILD` file is provided for Arch Linux users. It downloads `extract_msg` and non-system dependencies from PyPI as source tarballs and installs them to a private path (`/usr/lib/qt-msg-reader/python-packages/`) to avoid conflicts with user-installed Python packages.
 
 To install on Arch Linux:
 ```bash

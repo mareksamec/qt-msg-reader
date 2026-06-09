@@ -24,11 +24,20 @@ MsgParser::~MsgParser() {
 /**
  * Finds the Python packages directory.
  * Priority:
- * 1. Bundled python-packages next to executable (for deployment)
- * 2. .venv in source directory (for development)
+ * 1. Private install path (system package, isolated from user)
+ * 2. Bundled python-packages next to executable (CI/deployment)
+ * 3. System site-packages (fallback)
  */
 QString MsgParser::findSitePackages() {
-    // Option 1: Bundled packages next to executable
+    // Option 1: Private install path (isolated from user packages)
+    QString privatePath = QString(PYTHON_PRIVATE_PACKAGES_PATH);
+    QDir privateDir(privatePath);
+    if (privateDir.exists("extract_msg")) {
+        qDebug() << "Using private Python packages:" << privatePath;
+        return privatePath;
+    }
+
+    // Option 2: Bundled packages next to executable (CI/deployment)
     QString exeDir = QCoreApplication::applicationDirPath();
     QString bundledPath = QString("%1/%2").arg(exeDir, PYTHON_PACKAGES_DIR);
     QDir bundledDir(bundledPath);
@@ -37,17 +46,16 @@ QString MsgParser::findSitePackages() {
         return bundledPath;
     }
     
-    // Option 2: Development venv (using detected Python version)
-    QString venvPath = QString(PYTHON_VENV_PATH);
-    QString venvSitePackages = QString("%1/lib/%2/site-packages").arg(venvPath, PYTHON_VERSION_STRING);
-    QDir venvDir(venvSitePackages);
-    if (venvDir.exists("extract_msg")) {
-        qDebug() << "Using venv Python packages:" << venvSitePackages;
-        return venvSitePackages;
+    // Option 3: System site-packages (fallback)
+    QString systemPath = QString("/usr/lib/%1/site-packages").arg(PYTHON_VERSION_STRING);
+    QDir systemDir(systemPath);
+    if (systemDir.exists("extract_msg")) {
+        qDebug() << "Using system Python packages:" << systemPath;
+        return systemPath;
     }
     
     qWarning() << "Could not find extract_msg module";
-    qWarning() << "Searched:" << bundledPath << "and" << venvSitePackages;
+    qWarning() << "Searched:" << privatePath << bundledPath << "and" << systemPath;
     return QString();
 }
 
@@ -81,6 +89,14 @@ bool MsgParser::initPython() {
     if (sysModule) {
         PyObject* pathObj = PyObject_GetAttrString(sysModule, "path");
         if (pathObj && PyList_Check(pathObj)) {
+            // Add system site-packages as fallback for shared deps (bs4, olefile, etc.)
+            QString systemPath = QString("/usr/lib/%1/site-packages").arg(PYTHON_VERSION_STRING);
+            if (sitePackages != systemPath) {
+                PyObject* sysPath = PyUnicode_FromString(systemPath.toUtf8().constData());
+                PyList_Append(pathObj, sysPath);
+                Py_DECREF(sysPath);
+            }
+            // Add private/bundled packages path first
             PyObject* sitePath = PyUnicode_FromString(sitePackages.toUtf8().constData());
             PyList_Insert(pathObj, 0, sitePath);
             Py_DECREF(sitePath);
