@@ -92,6 +92,9 @@ qt-msg-reader/
 ```
 ## TODO
 - [ ] Re-write MsgParser to clean C or C++ to avoid Python dependency msg-extract
+      - `libmsg/` has a first pass at a standalone, dependency-free C library covering
+        the core fields (subject/body/HTML/sender/date/recipients/attachments). It
+        isn't wired into `MsgParser` yet — see `libmsg/README.md`.
 - [ ] Improve build system add Releases
 - [ ] Remove Windows support - not needed as you can use Outlook on Win.
 
