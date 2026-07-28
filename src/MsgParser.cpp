@@ -68,6 +68,7 @@ EmailMessage MsgParser::parse(const QString& filePath) {
         att.filename = a->filename ? QString::fromUtf8(a->filename)
                                     : QString("attachment_%1").arg(msg.attachments.size() + 1);
         att.mimeType = a->mimetype ? QString::fromUtf8(a->mimetype) : QString();
+        att.contentId = a->content_id ? QString::fromUtf8(a->content_id) : QString();
         if (a->data && a->size > 0) {
             att.data = QByteArray(reinterpret_cast<const char*>(a->data), static_cast<int>(a->size));
         }

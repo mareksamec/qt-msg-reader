@@ -46,6 +46,9 @@ typedef struct {
 typedef struct {
     char *filename;                /* best available filename, UTF-8; may be NULL */
     char *mimetype;                /* UTF-8; may be NULL if not stored */
+    char *content_id;              /* PR_ATTACH_CONTENT_ID, UTF-8; may be NULL.
+                                     * Matches "cid:" references in the HTML body
+                                     * for inline images. */
     unsigned char *data;           /* attachment bytes; may be NULL */
     size_t size;                   /* length of data in bytes */
 } msg_attachment_t;

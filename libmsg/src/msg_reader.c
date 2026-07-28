@@ -28,6 +28,7 @@
 #define PR_ATTACH_FILENAME      0x3704
 #define PR_ATTACH_MIME_TAG      0x370E
 #define PR_ATTACH_DATA_BIN      0x3701
+#define PR_ATTACH_CONTENT_ID    0x3712
 
 #define PROPERTIES_STREAM_NAME "__properties_version1.0"
 
@@ -117,6 +118,7 @@ static void free_attachments(msg_attachment_t *attachments, size_t count) {
     for (size_t i = 0; i < count; i++) {
         free(attachments[i].filename);
         free(attachments[i].mimetype);
+        free(attachments[i].content_id);
         free(attachments[i].data);
     }
     free(attachments);
@@ -174,6 +176,7 @@ static int load_attachments(msg_file_t *msg, const cfb_t *cfb, uint32_t codepage
         attachments[i].filename = get_string_with_fallback(cfb, att_id, PR_ATTACH_LONG_FILENAME,
                                                              PR_ATTACH_FILENAME, codepage);
         attachments[i].mimetype = msg_get_string_prop(cfb, att_id, PR_ATTACH_MIME_TAG, codepage);
+        attachments[i].content_id = msg_get_string_prop(cfb, att_id, PR_ATTACH_CONTENT_ID, codepage);
         attachments[i].data = msg_get_binary_prop(cfb, att_id, PR_ATTACH_DATA_BIN, &attachments[i].size);
     }
 

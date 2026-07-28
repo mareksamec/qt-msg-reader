@@ -42,7 +42,8 @@ qt-msg-reader/
 2. **MainWindow** - Main application window
    - File browser (QTreeView + MsgFileModel) - filtered to show only .msg files
    - Message header display (subject, from, to, cc, date)
-   - Body viewer (QTextEdit - supports HTML and plain text)
+   - Body viewer (QTextEdit - supports HTML and plain text, with inline
+     `cid:` images resolved to data: URIs before rendering)
    - Attachments table (QTableView + AttachmentModel)
    - Status log (QTextEdit with timestamped entries)
 
@@ -70,7 +71,7 @@ msg_get_recipient_count(msg);
 msg_get_recipient(msg, i);     // ->name, ->email, ->type (TO/CC/BCC)
 
 msg_get_attachment_count(msg);
-msg_get_attachment(msg, i);    // ->filename, ->mimetype, ->data, ->size
+msg_get_attachment(msg, i);    // ->filename, ->mimetype, ->content_id, ->data, ->size
 
 msg_close(msg);                 // frees everything the accessors returned
 ```
@@ -132,6 +133,9 @@ old commit history and PR discussions make sense; none of it applies to the
 current codebase.
 
 ## Recent Changes
+- Inline images: HTML bodies referencing attachments via `cid:` (PR_ATTACH_CONTENT_ID)
+  now render inline in the body viewer, resolved to `data:` URIs instead of only
+  appearing in the attachments list. See `MainWindow::resolveInlineImages()`.
 - Removed the Python/`extract_msg` dependency entirely; `MsgParser` now wraps
   `libmsg`, an in-tree pure-C library with no runtime dependencies
 - Added `libmsg/`: a from-scratch MS-CFB + MS-OXMSG reader, fuzz-tested under

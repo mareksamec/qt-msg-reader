@@ -21,7 +21,8 @@ actually used:
 * Sender name and email
 * Send/delivery date
 * Recipients (name, email, To/Cc/Bcc)
-* Attachments (filename, mimetype, raw bytes)
+* Attachments (filename, mimetype, content ID for inline/`cid:` images, raw
+  bytes)
 
 Explicitly out of scope for now: RTF bodies, named properties, embedded
 message attachments, signed messages, non-Message item types, and writing
@@ -70,7 +71,7 @@ if (!msg) { fprintf(stderr, "%s\n", msg_error_string(err)); return 1; }
 printf("%s\n", msg_get_subject(msg));
 for (size_t i = 0; i < msg_get_attachment_count(msg); i++) {
     const msg_attachment_t *a = msg_get_attachment(msg, i);
-    /* a->filename, a->mimetype, a->data, a->size */
+    /* a->filename, a->mimetype, a->content_id, a->data, a->size */
 }
 
 msg_close(msg);

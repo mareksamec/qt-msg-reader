@@ -35,6 +35,7 @@ RECIPIENT_NAME = "Bob Recipient"
 RECIPIENT_EMAIL = "bob@example.com"
 ATTACHMENT_FILENAME = "attachment.bin"
 ATTACHMENT_MIMETYPE = "application/octet-stream"
+ATTACHMENT_CONTENT_ID = "test-image@cid"
 ATTACHMENT_DATA = bytes((i % 256) for i in range(5000))
 SUBMIT_TIME_UNIX = 1710505800  # 2024-03-15T12:30:00Z
 
@@ -151,11 +152,12 @@ def build(out_path: str):
 
     s_att_filename = mini.add(utf16le(ATTACHMENT_FILENAME))
     s_att_mimetype = mini.add(utf16le(ATTACHMENT_MIMETYPE))
+    s_att_content_id = mini.add(utf16le(ATTACHMENT_CONTENT_ID))
 
     assert len(ATTACHMENT_DATA) >= MINI_STREAM_CUTOFF, "attachment must exercise the normal-FAT path"
 
-    # Directory sectors: 15 entries at 4 per sector -> sectors 1..4.
-    NUM_ENTRIES = 15
+    # Directory sectors: 16 entries at 4 per sector -> sectors 1..4.
+    NUM_ENTRIES = 16
     dir_sectors_needed = -(-NUM_ENTRIES // 4)
     first_dir_sector = 1
     minifat_sector = first_dir_sector + dir_sectors_needed  # 5
@@ -192,10 +194,12 @@ def build(out_path: str):
                             start_sector=s_recip_email[0], size=s_recip_email[1])
     entries[12] = DirEntry("__substg1.0_3707001F", 2, right=13,
                             start_sector=s_att_filename[0], size=s_att_filename[1])
-    entries[13] = DirEntry("__substg1.0_370E001F", 2, right=14,
+    entries[13] = DirEntry("__substg1.0_370E001F", 2, right=15,
                             start_sector=s_att_mimetype[0], size=s_att_mimetype[1])
     entries[14] = DirEntry("__substg1.0_37010102", 2,
                             start_sector=s_att_data[0], size=s_att_data[1])
+    entries[15] = DirEntry("__substg1.0_3712001F", 2, right=14,
+                            start_sector=s_att_content_id[0], size=s_att_content_id[1])
 
     dir_bytes = bytearray()
     for e in entries:
