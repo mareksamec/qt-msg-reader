@@ -3,8 +3,14 @@
 ## Project Overview
 Qt MSG Reader is a desktop application for viewing Microsoft Outlook MSG files. It's built with:
 - **C++/Qt6** for the GUI frontend
-- **Python extract_msg** library for parsing MSG files
+- **libmsg** (`libmsg/`), an in-tree pure-C library, for parsing MSG files
 - **CMake** build system
+
+Earlier versions shelled out to Python's `extract_msg` library via the Python
+C API (see "History" below). That dependency has been removed entirely -
+`.msg` parsing is now done in-process by `libmsg/`, which has no runtime
+dependency beyond libc. See `libmsg/README.md` for what it covers and what
+it deliberately leaves out.
 
 ## Architecture
 
@@ -14,10 +20,11 @@ qt-msg-reader/
 ├── src/
 │   ├── main.cpp           # Application entry point
 │   ├── MainWindow.h/cpp   # Main window UI with file browser, message view, attachments, status log
-│   ├── MsgParser.h/cpp    # Python bridge for MSG parsing
+│   ├── MsgParser.h/cpp    # Thin wrapper around libmsg for MSG parsing
 │   ├── EmailTypes.h       # Data structures (EmailMessage, EmailAttachment)
 │   ├── MsgFileModel.h/cpp # File system model filtered for .msg files
 │   └── AttachmentModel.h/cpp # Table model for attachments display
+├── libmsg/                # Pure-C .msg parsing library (own README, tests, CLI demo)
 ├── build/                 # Build output
 ├── PKGBUILD               # Arch Linux package build
 ├── CMakeLists.txt         # Build configuration
@@ -27,12 +34,10 @@ qt-msg-reader/
 
 ### Key Components
 
-1. **MsgParser** - Bridge between C++ and Python
-   - Uses Python C API to call extract_msg
-   - Static module loading (s_pythonInitialized, s_moduleLoaded, s_msgModule)
-   - Must use `Py_InitializeEx(0)` for simpler initialization
-   - GIL management with `PyGILState_Ensure()`/`PyGILState_Release()`
-   - Always call `PyErr_Clear()` after operations that may fail
+1. **MsgParser** - Wraps `libmsg` and maps its output onto `EmailMessage`/`EmailAttachment`
+   - `msg_open()` / `msg_close()` bracket a single parse call; no persistent state
+   - Recipients come from `msg_get_recipient()`, bucketed into to/cc/bcc by `msg_recipient_type_t`
+   - HTML body falls back automatically if the file has none (libmsg synthesizes it from the plain body)
 
 2. **MainWindow** - Main application window
    - File browser (QTreeView + MsgFileModel) - filtered to show only .msg files
@@ -44,94 +49,44 @@ qt-msg-reader/
 3. **EmailMessage** struct contains:
    - subject, bodyPlainText, bodyHtml
    - senderName, senderEmail
-   - toRecipients, ccRecipients
+   - toRecipients, ccRecipients, bccRecipients
    - date (QDateTime)
    - attachments (QList<EmailAttachment>)
 
-## Bug Fixes Applied
+## libmsg API Notes
 
-### 1. Python Initialization Crash
-- **Problem**: App crashed when opening MSG files due to Python init failure
-- **Solution**: Changed from `PyConfig_InitPythonConfig()` to simple `Py_InitializeEx(0)`
-- **Key insight**: Don't set `config.home` - let Python use system defaults, then add venv site-packages to sys.path
+```c
+msg_error_t err;
+msg_file_t *msg = msg_open(path, &err);   // NULL on failure
 
-### 2. Attachments Parsing
-- **Problem**: Attachments treated as dict (old API), but extract_msg returns list
-- **Solution**: Changed from `PyDict_Check()` iteration to `PyList_Check()` iteration
+msg_get_subject(msg);          // const char* (UTF-8), or NULL
+msg_get_body(msg);             // plain text, or NULL
+msg_get_html_body(msg);        // HTML, synthesized from plain body if absent
+msg_get_sender_name(msg);
+msg_get_sender_email(msg);
+msg_get_date(msg, &time_t_out);           // 0 on success, -1 if absent
 
-### 3. Sender Email Extraction
-- **Problem**: Tried to use `msg.header.from.email` but header is raw string
-- **Solution**: Extract email from `msg.sender` string using regex
+msg_get_recipient_count(msg);
+msg_get_recipient(msg, i);     // ->name, ->email, ->type (TO/CC/BCC)
 
-### 4. Recipients Parsing
-- **Problem**: `msg.to` and `msg.cc` are strings, not lists of objects
-- **Solution**: Use `msg.recipients` list (Recipient objects with type, email, name)
-  - type=1: TO recipient
-  - type=2: CC recipient
-- Fallback: Parse `msg.to`/`msg.cc` strings directly
+msg_get_attachment_count(msg);
+msg_get_attachment(msg, i);    // ->filename, ->mimetype, ->data, ->size
 
-### 5. HTML Body Display
-- **Problem**: htmlBody returned as bytes, displayed as raw text
-- **Solution**: Use `pyObjectToBytes()` then `QString::fromUtf8()`
-
-### 6. Python Error Handling
-- **Problem**: Uncleared Python exceptions caused cascading failures
-- **Solution**: Add `PyErr_Clear()` after operations that may fail
-
-## extract_msg API Notes
-
-```python
-msg = extract_msg.Message(filepath)
-
-# Properties:
-msg.subject      # str
-msg.body         # str or None (plain text)
-msg.htmlBody     # bytes or None
-msg.sender       # str like '"Name" <email@example.com>'
-msg.to           # str like '<email@example.com>'
-msg.cc           # str or None
-msg.date         # datetime
-msg.recipients   # list of Recipient objects
-msg.attachments  # list of Attachment objects
-
-# Recipient object:
-recipient.email  # str
-recipient.name   # str
-recipient.type   # int (1=TO, 2=CC)
-
-# Attachment object:
-att.longFilename  # str or None
-att.shortFilename # str or None
-att.name          # str
-att.mimetype      # str or None
-att.data          # bytes (call as method if callable)
+msg_close(msg);                 // frees everything the accessors returned
 ```
+
+Full scope/limitations are documented in `libmsg/README.md` - notably no RTF
+decompression, named properties, embedded-message attachments, or non-Message
+item types.
 
 ## Build & Run
 
 ```bash
-cd /home/marek/nosync-Trustsoft/personal/qt-msg-reader/build
+cd build
 cmake ..
 make -j$(nproc)
 ./qt-msg-reader [file.msg]
 ```
-
-## Python Packages
-
-The application installs `extract_msg` and its non-system dependencies to a private path to avoid conflicts with user packages.
-
-**Install path:** `/usr/lib/qt-msg-reader/python-packages/`
-
-**System dependencies** (listed in PKGBUILD `depends=()`): beautifulsoup4, olefile, lark-parser, pyparsing
-
-**Vendored packages** (installed to private path): extract_msg, compressed-rtf, ebcdic, RTFDE, red-black-tree-mod, oletools, pcodedmp, msoffcrypto-tool
-
-**CI (GitHub Actions):** Bundles `python-packages/` directory next to the executable
-
-The `MsgParser::findSitePackages()` method searches in this order:
-1. `/usr/lib/qt-msg-reader/python-packages/` (private install, normal usage)
-2. `<exe_dir>/python-packages/` (bundled, for CI/deployment)
-3. `/usr/lib/<python-version>/site-packages` (system fallback)
 
 ## GitHub Actions CI
 
@@ -141,10 +96,8 @@ The workflow (`.github/workflows/cmake-multi-platform.yml`) builds for:
 
 Key steps:
 1. Installs Qt6 via `jurplel/install-qt-action`
-2. Sets up Python 3.13 and installs `extract_msg`
-3. Builds the application
-4. Copies Python packages to build output
-5. Uploads artifacts (executable + python-packages)
+2. Builds the application (CMake pulls in `libmsg/` as a subdirectory)
+3. Uploads artifacts (single self-contained executable per platform)
 
 ### Manual Releases
 
@@ -159,24 +112,36 @@ To create a release:
 
 ## Arch Linux Package
 
-A `PKGBUILD` file is provided for Arch Linux users. It downloads `extract_msg` and non-system dependencies from PyPI as source tarballs and installs them to a private path (`/usr/lib/qt-msg-reader/python-packages/`) to avoid conflicts with user-installed Python packages.
+A `PKGBUILD` file is provided for Arch Linux users. It only depends on
+`qt6-base` - no Python or vendored packages to install.
 
 To install on Arch Linux:
 ```bash
 makepkg -si
 ```
 
+## History: the Python bridge (removed)
+
+Earlier versions used Python's `extract_msg` library via the Python C API,
+loaded through a private `python-packages/` install to avoid clashing with
+user-installed packages. That whole layer - `Py_InitializeEx` setup, GIL
+management, `PyErr_Clear()` after every fallible call, `findSitePackages()`,
+the PKGBUILD's vendored PyPI sources, and the CI steps that bundled a Python
+interpreter next to the executable - is gone. It's mentioned here only so
+old commit history and PR discussions make sense; none of it applies to the
+current codebase.
+
 ## Recent Changes
+- Removed the Python/`extract_msg` dependency entirely; `MsgParser` now wraps
+  `libmsg`, an in-tree pure-C library with no runtime dependencies
+- Added `libmsg/`: a from-scratch MS-CFB + MS-OXMSG reader, fuzz-tested under
+  ASan/UBSan
+- Simplified CMakeLists.txt, PKGBUILD, and CI workflow accordingly (no more
+  Python setup, package bundling, or site-packages path juggling)
 - Added PKGBUILD for Arch Linux packaging
 - Added manual release workflow with version input
 - Releases include Linux/Windows binaries + source tarball
 - Added GitHub Actions CI workflow for Linux and Windows
-- Made Python version detection flexible (supports 3.13, 3.14, etc.)
-- Bundled Python packages with the executable for deployment
-- Added `findSitePackages()` to locate packages (bundled or venv)
-- CMake copies site-packages to build directory
-- Added comprehensive comments to all methods and key code sections
-- Updated README.md with current project structure and usage
 - Added status log window with timestamped entries
 - Log shows: file loading, subject, body type/size, attachments
 - Warnings (orange) and errors (red) highlighted

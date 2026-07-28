@@ -15,7 +15,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -35,13 +35,6 @@ jobs:
       with:
         version: '6.8.0'
 
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-
-    - name: Install Python dependencies
-      run: pip install extract_msg
-
     - name: Set reusable strings
       id: strings
       shell: bash
@@ -55,7 +48,6 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=Release
-        -DPYTHON_SITE_PACKAGES="${{ env.pythonLocation }}/lib/python3.13/site-packages"
         -S ${{ github.workspace }}
 
     - name: Configure CMake (Windows)
@@ -65,31 +57,16 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=Release
-        -DPYTHON_SITE_PACKAGES="${{ env.pythonLocation }}/Lib/site-packages"
         -S ${{ github.workspace }}
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Release
 
-    - name: Copy Python packages (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        mkdir -p ${{ steps.strings.outputs.build-output-dir }}/python-packages
-        cp -r ${{ env.pythonLocation }}/lib/python3.13/site-packages/* ${{ steps.strings.outputs.build-output-dir }}/python-packages/
-
-    - name: Copy Python packages (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $dest = "${{ steps.strings.outputs.build-output-dir }}\python-packages"
-        New-Item -ItemType Directory -Force -Path $dest
-        Copy-Item -Path "${{ env.pythonLocation }}\Lib\site-packages\*" -Destination $dest -Recurse -Force
-
     - name: Create archive (Linux)
       if: runner.os == 'Linux'
       run: |
         cd ${{ steps.strings.outputs.build-output-dir }}
-        tar -czvf qt-msg-reader-linux-x86_64.tar.gz qt-msg-reader python-packages
+        tar -czvf qt-msg-reader-linux-x86_64.tar.gz qt-msg-reader
 
     - name: Create archive (Windows)
       if: runner.os == 'Windows'
@@ -100,7 +77,7 @@ jobs:
         if (Test-Path $exePath) {
             Move-Item $exePath $buildDir
         }
-        Compress-Archive -Path "$buildDir\qt-msg-reader.exe", "$buildDir\python-packages" -DestinationPath "$buildDir\qt-msg-reader-windows-x86_64.zip"
+        Compress-Archive -Path "$buildDir\qt-msg-reader.exe" -DestinationPath "$buildDir\qt-msg-reader-windows-x86_64.zip"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -113,7 +90,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    
+
     steps:
     - uses: actions/checkout@v4
 
@@ -125,7 +102,7 @@ jobs:
     - name: Create source tarball
       run: |
         mkdir -p release
-        tar -czvf release/source.tar.gz --exclude='.git' --exclude='build' --exclude='.venv' --exclude='artifacts' .
+        tar -czvf release/source.tar.gz --exclude='.git' --exclude='build' --exclude='artifacts' .
 
     - name: Move artifacts to release directory
       run: |

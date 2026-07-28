@@ -15,8 +15,7 @@ This application provides a simple graphical interface to:
 
 The application is built with:
 - **C++/Qt6** for the GUI frontend
-- **Python extract_msg** library for parsing MSG files
-- **Python C API** for bridging C++ and Python
+- **libmsg** (`libmsg/`), an in-tree pure-C library, for parsing `.msg` files
 - **CMake** build system
 
 ### Key Components
@@ -25,7 +24,7 @@ The application is built with:
 |------|-------------|
 | `main.cpp` | Application entry point |
 | `MainWindow.h/cpp` | Main window with file browser, message view, attachments, and status log |
-| `MsgParser.h/cpp` | Python bridge for MSG parsing using extract_msg |
+| `MsgParser.h/cpp` | Thin C++ wrapper around `libmsg` for MSG parsing |
 | `EmailTypes.h` | Data structures (EmailMessage, EmailAttachment) |
 | `MsgFileModel.h/cpp` | File system model filtered for .msg files |
 | `AttachmentModel.h/cpp` | Table model for attachments display |
@@ -33,9 +32,12 @@ The application is built with:
 ## Dependencies
 
 - **Qt 6.x** - GUI framework (Qt::Widgets, Qt::Core)
-- **Python 3.x** - Required at runtime (uses Python C API)
 - **CMake 3.16+** - Build system
-- **C++17** - Language standard
+- **C++17** / **C99** - Language standards
+
+No Python, and no other runtime dependency beyond Qt and libc - `.msg` parsing
+is done in-process by `libmsg/`, a small dependency-free C library (see
+`libmsg/README.md` for its scope and limitations).
 
 ## Building
 
@@ -47,7 +49,7 @@ make -j$(nproc)
 
 ## Deployment
 
-The application requires Python installed on the target system. The `extract_msg` library and its non-system dependencies are installed to a private path (`/usr/lib/qt-msg-reader/python-packages/`) to avoid conflicts with user packages.
+The built binary has no dependency beyond the Qt runtime libraries.
 
 On Arch Linux:
 ```bash
@@ -83,15 +85,15 @@ qt-msg-reader/
 ├── src/
 │   ├── main.cpp             # Application entry point
 │   ├── MainWindow.h/cpp     # Main window UI
-│   ├── MsgParser.h/cpp      # Python bridge for MSG parsing
+│   ├── MsgParser.h/cpp      # libmsg wrapper for MSG parsing
 │   ├── EmailTypes.h         # Data structures
 │   ├── MsgFileModel.h/cpp   # File browser model
 │   └── AttachmentModel.h/cpp # Attachment table model
+├── libmsg/                  # Pure-C .msg parsing library (see libmsg/README.md)
 └── build/
     └── qt-msg-reader        # Executable
 ```
 ## TODO
-- [ ] Re-write MsgParser to clean C or C++ to avoid Python dependency msg-extract
 - [ ] Improve build system add Releases
 - [ ] Remove Windows support - not needed as you can use Outlook on Win.
 

@@ -8,7 +8,19 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+# libmsg is a standalone, Qt-agnostic C library; only the static library
+# target is needed here, not its own demo tool/test suite. Keep AUTOMOC/
+# AUTOUIC/AUTORCC from leaking into it - it has no Qt sources of its own.
+set(LIBMSG_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LIBMSG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CMAKE_AUTOMOC OFF)
+set(CMAKE_AUTORCC OFF)
+set(CMAKE_AUTOUIC OFF)
+add_subdirectory(libmsg)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
@@ -25,45 +37,14 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
-    Python3::Python
+    msg
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${Python3_INCLUDE_DIRS}
-)
-
-# Define paths for Python packages
-set(PYTHON_PACKAGES_DIR "python-packages")
-set(PYTHON_PRIVATE_PACKAGES_PATH "${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/${PYTHON_PACKAGES_DIR}")
-
-# Detect Python version for path construction
-execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')"
-    OUTPUT_VARIABLE PYTHON_VERSION_STRING
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    PYTHON_PACKAGES_DIR="${PYTHON_PACKAGES_DIR}"
-    PYTHON_PRIVATE_PACKAGES_PATH="${PYTHON_PRIVATE_PACKAGES_PATH}"
-    PYTHON_VERSION_STRING="${PYTHON_VERSION_STRING}"
 )
 
 install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
 )
-
-install(DIRECTORY DESTINATION "lib/${PROJECT_NAME}/${PYTHON_PACKAGES_DIR}")
-
-# Option to install private Python packages during build
-option(INSTALL_PYTHON_DEPS "Install extract_msg and all dependencies to build directory" OFF)
-if(INSTALL_PYTHON_DEPS)
-    add_custom_command(
-        TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${Python3_EXECUTABLE} -m pip install --target
-            "${CMAKE_BINARY_DIR}/${PYTHON_PACKAGES_DIR}" extract_msg
-        COMMENT "Installing Python packages to build directory"
-    )
-endif()
