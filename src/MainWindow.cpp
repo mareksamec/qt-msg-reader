@@ -115,14 +115,22 @@ void MainWindow::setupUi() {
     headerLayout->setColumnStretch(1, 1);
     messageLayout->addWidget(headerGroup);
     
-    // Body section
+    // Body section: HTML tab (default) and a plain-text tab
     QGroupBox* bodyGroup = new QGroupBox(tr("Message Body"), m_messagePanel);
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyGroup);
-    
-    m_bodyView = new QTextEdit;
-    m_bodyView->setReadOnly(true);
-    bodyLayout->addWidget(m_bodyView);
-    
+
+    m_bodyTabs = new QTabWidget;
+
+    m_bodyHtmlView = new QTextEdit;
+    m_bodyHtmlView->setReadOnly(true);
+    m_bodyTabs->addTab(m_bodyHtmlView, tr("HTML"));
+
+    m_bodyTextView = new QTextEdit;
+    m_bodyTextView->setReadOnly(true);
+    m_bodyTabs->addTab(m_bodyTextView, tr("Text"));
+
+    bodyLayout->addWidget(m_bodyTabs);
+
     messageLayout->addWidget(bodyGroup, 1);
     
     m_contentSplitter->addWidget(m_messagePanel);
@@ -210,20 +218,33 @@ void MainWindow::updateMessageView(const EmailMessage& msg) {
         m_dateLabel->setText(tr("(unknown date)"));
     }
     
-    // Update body - prefer HTML over plain text
-    QString bodyText = msg.bodyHtml.isEmpty() ? msg.bodyPlainText : msg.bodyHtml;
-    bodyText.remove('\0');
-    
-    if (!msg.bodyHtml.isEmpty()) {
-        m_bodyView->setHtml(bodyText);
-        log(tr("Body: HTML (%1 chars)").arg(msg.bodyHtml.length()));
-    } else if (!msg.bodyPlainText.isEmpty()) {
-        m_bodyView->setPlainText(bodyText);
-        log(tr("Body: Plain text (%1 chars)").arg(msg.bodyPlainText.length()));
+    // Update body - HTML and plain text are shown in their own tabs rather
+    // than picking one, so both are always available regardless of which
+    // the file actually provided.
+    QString htmlBody = msg.bodyHtml;
+    htmlBody.remove('\0');
+    QString textBody = msg.bodyPlainText;
+    textBody.remove('\0');
+
+    if (!htmlBody.isEmpty()) {
+        m_bodyHtmlView->setHtml(htmlBody);
+        log(tr("Body: HTML (%1 chars)").arg(htmlBody.length()));
     } else {
-        m_bodyView->setPlainText(tr("(no message body)"));
+        m_bodyHtmlView->setPlainText(tr("(no HTML body)"));
+    }
+
+    if (!textBody.isEmpty()) {
+        m_bodyTextView->setPlainText(textBody);
+        log(tr("Body: Plain text (%1 chars)").arg(textBody.length()));
+    } else {
+        m_bodyTextView->setPlainText(tr("(no plain text body)"));
+    }
+
+    if (htmlBody.isEmpty() && textBody.isEmpty()) {
         logWarning(tr("No message body found"));
     }
+
+    m_bodyTabs->setCurrentIndex(0); // default to the HTML tab
     
     // Update attachments
     m_attachmentModel->setAttachments(msg.attachments);
