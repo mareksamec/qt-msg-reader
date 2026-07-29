@@ -14,6 +14,8 @@ add_library(msg STATIC
     src/msg_strings.h
     src/msg_properties.c
     src/msg_properties.h
+    src/msg_rtf.c
+    src/msg_rtf.h
     src/msg_reader.c
 )
 
@@ -38,4 +40,12 @@ if(LIBMSG_BUILD_TESTS)
     add_executable(test_basic tests/test_basic.c)
     target_link_libraries(test_basic PRIVATE msg)
     add_test(NAME test_basic COMMAND test_basic "${CMAKE_CURRENT_SOURCE_DIR}/tests/sample.msg")
+
+    add_executable(test_rtf tests/test_rtf.c)
+    target_link_libraries(test_rtf PRIVATE msg)
+    add_test(NAME test_rtf COMMAND test_rtf)
+
+    add_executable(test_rtf_msg tests/test_rtf_msg.c)
+    target_link_libraries(test_rtf_msg PRIVATE msg)
+    add_test(NAME test_rtf_msg COMMAND test_rtf_msg "${CMAKE_CURRENT_SOURCE_DIR}/tests/sample_rtf.msg")
 endif()

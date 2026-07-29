@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QTableView>
 #include <QSplitter>
+#include <QTabWidget>
 #include "MsgParser.h"
 #include "MsgFileModel.h"
 #include "AttachmentModel.h"
@@ -65,7 +66,9 @@ private:
     QLabel* m_toLabel;
     QLabel* m_ccLabel;
     QLabel* m_dateLabel;
-    QTextEdit* m_bodyView;
+    QTabWidget* m_bodyTabs;
+    QTextEdit* m_htmlBodyView;
+    QTextEdit* m_plainBodyView;
     
     QTableView* m_attachmentView;
     AttachmentModel* m_attachmentModel;

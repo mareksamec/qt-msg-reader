@@ -37,13 +37,16 @@ qt-msg-reader/
 1. **MsgParser** - Wraps `libmsg` and maps its output onto `EmailMessage`/`EmailAttachment`
    - `msg_open()` / `msg_close()` bracket a single parse call; no persistent state
    - Recipients come from `msg_get_recipient()`, bucketed into to/cc/bcc by `msg_recipient_type_t`
-   - HTML body falls back automatically if the file has none (libmsg synthesizes it from the plain body)
+   - HTML body falls back automatically if the file has none: libmsg first tries
+     PR_RTF_COMPRESSED (decompressing it and recovering the original HTML if it's
+     "\fromhtml1"-encapsulated), then as a last resort synthesizes HTML from the
+     plain body
 
 2. **MainWindow** - Main application window
    - File browser (QTreeView + MsgFileModel) - filtered to show only .msg files
    - Message header display (subject, from, to, cc, date)
-   - Body viewer (QTextEdit - supports HTML and plain text, with inline
-     `cid:` images resolved to data: URIs before rendering)
+   - Body viewer: a tabbed QTextEdit pair (HTML tab, default; Plain Text tab),
+     with inline `cid:` images resolved to data: URIs before rendering the HTML tab
    - Attachments table (QTableView + AttachmentModel)
    - Status log (QTextEdit with timestamped entries)
 
@@ -76,9 +79,10 @@ msg_get_attachment(msg, i);    // ->filename, ->mimetype, ->content_id, ->data, 
 msg_close(msg);                 // frees everything the accessors returned
 ```
 
-Full scope/limitations are documented in `libmsg/README.md` - notably no RTF
-decompression, named properties, embedded-message attachments, or non-Message
-item types.
+Full scope/limitations are documented in `libmsg/README.md` - notably RTF
+support recovers text/HTML but not RTF's own formatting (fonts/colors/tables),
+and there's still no support for named properties, embedded-message
+attachments, or non-Message item types.
 
 ## Build & Run
 
@@ -133,6 +137,14 @@ old commit history and PR discussions make sense; none of it applies to the
 current codebase.
 
 ## Recent Changes
+- RTF fallback: libmsg now decompresses PR_RTF_COMPRESSED (MS-OXRTFCP) and, when
+  it isn't already present as PR_HTML, recovers the real HTML from RTF that
+  encapsulates it (MS-OXRTFEX `\fromhtml1`/`\htmltag`/`\htmlrtf`), or otherwise
+  its plain text - fixing messages composed in Outlook's Rich Text format that
+  previously showed no body at all, or an unformatted plain-text-only body.
+  See `libmsg/src/msg_rtf.c`.
+- Message Body is now a two-tab view (HTML tab, default; Plain Text tab) instead
+  of a single widget that only showed one or the other.
 - Inline images: HTML bodies referencing attachments via `cid:` (PR_ATTACH_CONTENT_ID)
   now render inline in the body viewer, resolved to `data:` URIs instead of only
   appearing in the attachments list. See `MainWindow::resolveInlineImages()`.

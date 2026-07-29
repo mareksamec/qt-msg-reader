@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <time.h>
 
+/* Encodes a single Unicode code point as UTF-8 into `out` (which must have
+ * room for at least 4 bytes) and returns the number of bytes written. */
+size_t msg_utf8_encode(uint32_t cp, uint8_t *out);
+
 /* Converts a UTF-16LE byte buffer (as stored in "...001F" streams) to a
  * malloc'd, NUL-terminated UTF-8 string. Handles surrogate pairs. */
 char *msg_utf16le_to_utf8(const uint8_t *data, size_t len);

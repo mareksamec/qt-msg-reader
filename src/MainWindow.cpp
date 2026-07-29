@@ -15,6 +15,7 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QHash>
+#include <QTextDocument>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -122,11 +123,19 @@ void MainWindow::setupUi() {
     // Body section
     QGroupBox* bodyGroup = new QGroupBox(tr("Message Body"), m_messagePanel);
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyGroup);
-    
-    m_bodyView = new QTextEdit;
-    m_bodyView->setReadOnly(true);
-    bodyLayout->addWidget(m_bodyView);
-    
+
+    m_bodyTabs = new QTabWidget;
+
+    m_htmlBodyView = new QTextEdit;
+    m_htmlBodyView->setReadOnly(true);
+    m_bodyTabs->addTab(m_htmlBodyView, tr("HTML"));
+
+    m_plainBodyView = new QTextEdit;
+    m_plainBodyView->setReadOnly(true);
+    m_bodyTabs->addTab(m_plainBodyView, tr("Plain Text"));
+
+    bodyLayout->addWidget(m_bodyTabs);
+
     messageLayout->addWidget(bodyGroup, 1);
     
     m_contentSplitter->addWidget(m_messagePanel);
@@ -264,21 +273,34 @@ void MainWindow::updateMessageView(const EmailMessage& msg) {
         m_dateLabel->setText(tr("(unknown date)"));
     }
     
-    // Update body - prefer HTML over plain text
-    QString bodyText = msg.bodyHtml.isEmpty() ? msg.bodyPlainText : msg.bodyHtml;
-    bodyText.remove('\0');
-    
-    if (!msg.bodyHtml.isEmpty()) {
-        QString htmlWithInlineImages = resolveInlineImages(bodyText, msg.attachments);
-        m_bodyView->setHtml(htmlWithInlineImages);
-        log(tr("Body: HTML (%1 chars)").arg(msg.bodyHtml.length()));
-    } else if (!msg.bodyPlainText.isEmpty()) {
-        m_bodyView->setPlainText(bodyText);
-        log(tr("Body: Plain text (%1 chars)").arg(msg.bodyPlainText.length()));
+    // Update body - HTML tab (default) and Plain Text tab
+    QString htmlBody = msg.bodyHtml;
+    htmlBody.remove('\0');
+    QString plainBody = msg.bodyPlainText;
+    plainBody.remove('\0');
+
+    if (!htmlBody.isEmpty()) {
+        QString htmlWithInlineImages = resolveInlineImages(htmlBody, msg.attachments);
+        m_htmlBodyView->setHtml(htmlWithInlineImages);
+        log(tr("Body: HTML (%1 chars)").arg(htmlBody.length()));
     } else {
-        m_bodyView->setPlainText(tr("(no message body)"));
+        m_htmlBodyView->setPlainText(tr("(no message body)"));
         logWarning(tr("No message body found"));
     }
+
+    if (!plainBody.isEmpty()) {
+        m_plainBodyView->setPlainText(plainBody);
+    } else if (!htmlBody.isEmpty()) {
+        // No separate plain text part was stored; derive one from the HTML
+        // so the Plain Text tab isn't just empty.
+        QTextDocument doc;
+        doc.setHtml(htmlBody);
+        m_plainBodyView->setPlainText(doc.toPlainText());
+    } else {
+        m_plainBodyView->setPlainText(tr("(no message body)"));
+    }
+
+    m_bodyTabs->setCurrentIndex(0);
     
     // Update attachments
     m_attachmentModel->setAttachments(msg.attachments);
