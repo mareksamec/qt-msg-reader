@@ -11,6 +11,11 @@
 #include <QApplication>
 #include <QStyle>
 #include <QTime>
+#include <QRegularExpression>
+#include <QMimeDatabase>
+#include <QMimeType>
+#include <QHash>
+#include <QTextDocument>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -118,11 +123,19 @@ void MainWindow::setupUi() {
     // Body section
     QGroupBox* bodyGroup = new QGroupBox(tr("Message Body"), m_messagePanel);
     QVBoxLayout* bodyLayout = new QVBoxLayout(bodyGroup);
-    
-    m_bodyView = new QTextEdit;
-    m_bodyView->setReadOnly(true);
-    bodyLayout->addWidget(m_bodyView);
-    
+
+    m_bodyTabs = new QTabWidget;
+
+    m_htmlBodyView = new QTextEdit;
+    m_htmlBodyView->setReadOnly(true);
+    m_bodyTabs->addTab(m_htmlBodyView, tr("HTML"));
+
+    m_plainBodyView = new QTextEdit;
+    m_plainBodyView->setReadOnly(true);
+    m_bodyTabs->addTab(m_plainBodyView, tr("Plain Text"));
+
+    bodyLayout->addWidget(m_bodyTabs);
+
     messageLayout->addWidget(bodyGroup, 1);
     
     m_contentSplitter->addWidget(m_messagePanel);
@@ -181,6 +194,56 @@ void MainWindow::loadFile(const QString& filePath) {
     log(tr("File loaded successfully"));
 }
 
+static QString mimeTypeForAttachment(const EmailAttachment& att) {
+    if (!att.mimeType.isEmpty()) return att.mimeType;
+
+    QMimeDatabase db;
+    QMimeType byName = db.mimeTypeForFile(att.filename, QMimeDatabase::MatchExtension);
+    if (byName.isValid() && byName.name() != "application/octet-stream") return byName.name();
+
+    QMimeType byData = db.mimeTypeForData(att.data);
+    return byData.name();
+}
+
+QString MainWindow::resolveInlineImages(const QString& html, const QList<EmailAttachment>& attachments) const {
+    if (html.isEmpty() || attachments.isEmpty()) return html;
+
+    QHash<QString, int> attachmentByContentId;
+    for (int i = 0; i < attachments.size(); i++) {
+        QString cid = attachments[i].contentId.trimmed();
+        if (cid.isEmpty()) continue;
+        if (cid.startsWith('<') && cid.endsWith('>')) cid = cid.mid(1, cid.length() - 2);
+        attachmentByContentId.insert(cid, i);
+    }
+    if (attachmentByContentId.isEmpty()) return html;
+
+    static const QRegularExpression cidRef(
+        R"((?:src|background)\s*=\s*(["'])cid:([^"'>]+)\1)",
+        QRegularExpression::CaseInsensitiveOption);
+
+    QString result;
+    result.reserve(html.size());
+    int lastPos = 0;
+    QRegularExpressionMatchIterator it = cidRef.globalMatch(html);
+    while (it.hasNext()) {
+        QRegularExpressionMatch m = it.next();
+        result += html.mid(lastPos, m.capturedStart() - lastPos);
+        lastPos = m.capturedEnd();
+
+        int index = attachmentByContentId.value(m.captured(2), -1);
+        if (index < 0) {
+            result += m.captured(0);
+            continue;
+        }
+
+        const EmailAttachment& att = attachments[index];
+        result += QString("src=\"data:%1;base64,%2\"")
+                      .arg(mimeTypeForAttachment(att), QString::fromLatin1(att.data.toBase64()));
+    }
+    result += html.mid(lastPos);
+    return result;
+}
+
 void MainWindow::updateMessageView(const EmailMessage& msg) {
     // Update subject
     m_subjectLabel->setText(msg.subject.isEmpty() ? tr("(no subject)") : msg.subject);
@@ -210,20 +273,34 @@ void MainWindow::updateMessageView(const EmailMessage& msg) {
         m_dateLabel->setText(tr("(unknown date)"));
     }
     
-    // Update body - prefer HTML over plain text
-    QString bodyText = msg.bodyHtml.isEmpty() ? msg.bodyPlainText : msg.bodyHtml;
-    bodyText.remove('\0');
-    
-    if (!msg.bodyHtml.isEmpty()) {
-        m_bodyView->setHtml(bodyText);
-        log(tr("Body: HTML (%1 chars)").arg(msg.bodyHtml.length()));
-    } else if (!msg.bodyPlainText.isEmpty()) {
-        m_bodyView->setPlainText(bodyText);
-        log(tr("Body: Plain text (%1 chars)").arg(msg.bodyPlainText.length()));
+    // Update body - HTML tab (default) and Plain Text tab
+    QString htmlBody = msg.bodyHtml;
+    htmlBody.remove('\0');
+    QString plainBody = msg.bodyPlainText;
+    plainBody.remove('\0');
+
+    if (!htmlBody.isEmpty()) {
+        QString htmlWithInlineImages = resolveInlineImages(htmlBody, msg.attachments);
+        m_htmlBodyView->setHtml(htmlWithInlineImages);
+        log(tr("Body: HTML (%1 chars)").arg(htmlBody.length()));
     } else {
-        m_bodyView->setPlainText(tr("(no message body)"));
+        m_htmlBodyView->setPlainText(tr("(no message body)"));
         logWarning(tr("No message body found"));
     }
+
+    if (!plainBody.isEmpty()) {
+        m_plainBodyView->setPlainText(plainBody);
+    } else if (!htmlBody.isEmpty()) {
+        // No separate plain text part was stored; derive one from the HTML
+        // so the Plain Text tab isn't just empty.
+        QTextDocument doc;
+        doc.setHtml(htmlBody);
+        m_plainBodyView->setPlainText(doc.toPlainText());
+    } else {
+        m_plainBodyView->setPlainText(tr("(no message body)"));
+    }
+
+    m_bodyTabs->setCurrentIndex(0);
     
     // Update attachments
     m_attachmentModel->setAttachments(msg.attachments);

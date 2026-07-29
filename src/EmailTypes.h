@@ -12,6 +12,7 @@
 struct EmailAttachment {
     QString filename;
     QString mimeType;
+    QString contentId;  // PR_ATTACH_CONTENT_ID; matches "cid:" references for inline images
     QByteArray data;
     qint64 size;
 };

@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QTableView>
 #include <QSplitter>
+#include <QTabWidget>
 #include "MsgParser.h"
 #include "MsgFileModel.h"
 #include "AttachmentModel.h"
@@ -42,6 +43,10 @@ private:
     void setupMenus();
     /** Updates the message view with parsed email data. */
     void updateMessageView(const EmailMessage& msg);
+    /** Replaces "cid:" image references in HTML with inline data: URIs sourced
+     *  from matching attachments' PR_ATTACH_CONTENT_ID, so inline images show
+     *  in the body instead of only appearing in the attachments list. */
+    QString resolveInlineImages(const QString& html, const QList<EmailAttachment>& attachments) const;
     /** Logs a message to the status log with timestamp. */
     void log(const QString& message);
     /** Logs a warning message (orange) to the status log. */
@@ -61,7 +66,9 @@ private:
     QLabel* m_toLabel;
     QLabel* m_ccLabel;
     QLabel* m_dateLabel;
-    QTextEdit* m_bodyView;
+    QTabWidget* m_bodyTabs;
+    QTextEdit* m_htmlBodyView;
+    QTextEdit* m_plainBodyView;
     
     QTableView* m_attachmentView;
     AttachmentModel* m_attachmentModel;

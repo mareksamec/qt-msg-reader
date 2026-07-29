@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static size_t utf8_encode(uint32_t cp, uint8_t *out) {
+size_t msg_utf8_encode(uint32_t cp, uint8_t *out) {
     if (cp <= 0x7F) {
         out[0] = (uint8_t)cp;
         return 1;
@@ -50,7 +50,7 @@ char *msg_utf16le_to_utf8(const uint8_t *data, size_t len) {
             cp = unit;
         }
 
-        out_pos += utf8_encode(cp, out + out_pos);
+        out_pos += msg_utf8_encode(cp, out + out_pos);
     }
     out[out_pos] = '\0';
     return (char *)out;
@@ -80,7 +80,7 @@ char *msg_codepage_to_utf8(const uint8_t *data, size_t len, uint32_t codepage) {
             cp = CP1252_HIGH[b - 0x80];
             if (cp == 0) cp = 0xFFFD;
         }
-        out_pos += utf8_encode(cp, out + out_pos);
+        out_pos += msg_utf8_encode(cp, out + out_pos);
     }
     out[out_pos] = '\0';
     return (char *)out;

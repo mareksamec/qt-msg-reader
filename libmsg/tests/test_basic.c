@@ -59,6 +59,7 @@ int main(int argc, char **argv) {
         const msg_attachment_t *a = msg_get_attachment(msg, 0);
         CHECK_STR(a->filename, "attachment.bin");
         CHECK_STR(a->mimetype, "application/octet-stream");
+        CHECK_STR(a->content_id, "test-image@cid");
         CHECK(a->size == 5000, "expected 5000 bytes of attachment data, got %zu", a->size);
         int data_ok = 1;
         if (a->data) {

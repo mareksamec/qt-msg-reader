@@ -5,6 +5,7 @@
 
 #include "cfb.h"
 #include "msg_properties.h"
+#include "msg_rtf.h"
 #include "msg_strings.h"
 
 /* MAPI property tags used below (see MS-OXPROPS / MS-OXMSG). Only the
@@ -14,6 +15,7 @@
 #define PR_SUBJECT              0x0037
 #define PR_BODY                 0x1000
 #define PR_HTML                 0x1013
+#define PR_RTF_COMPRESSED       0x1009
 #define PR_SENDER_NAME          0x0C1A
 #define PR_SENDER_EMAIL_ADDRESS 0x0C1F
 #define PR_SENDER_SMTP_ADDRESS  0x5D01
@@ -28,6 +30,7 @@
 #define PR_ATTACH_FILENAME      0x3704
 #define PR_ATTACH_MIME_TAG      0x370E
 #define PR_ATTACH_DATA_BIN      0x3701
+#define PR_ATTACH_CONTENT_ID    0x3712
 
 #define PROPERTIES_STREAM_NAME "__properties_version1.0"
 
@@ -117,6 +120,7 @@ static void free_attachments(msg_attachment_t *attachments, size_t count) {
     for (size_t i = 0; i < count; i++) {
         free(attachments[i].filename);
         free(attachments[i].mimetype);
+        free(attachments[i].content_id);
         free(attachments[i].data);
     }
     free(attachments);
@@ -174,6 +178,7 @@ static int load_attachments(msg_file_t *msg, const cfb_t *cfb, uint32_t codepage
         attachments[i].filename = get_string_with_fallback(cfb, att_id, PR_ATTACH_LONG_FILENAME,
                                                              PR_ATTACH_FILENAME, codepage);
         attachments[i].mimetype = msg_get_string_prop(cfb, att_id, PR_ATTACH_MIME_TAG, codepage);
+        attachments[i].content_id = msg_get_string_prop(cfb, att_id, PR_ATTACH_CONTENT_ID, codepage);
         attachments[i].data = msg_get_binary_prop(cfb, att_id, PR_ATTACH_DATA_BIN, &attachments[i].size);
     }
 
@@ -232,7 +237,30 @@ msg_file_t *msg_open(const char *path, msg_error_t *err_out) {
         }
         free(html_raw);
         msg->html_body = html;
-    } else if (msg->body) {
+    }
+
+    /* Neither PR_BODY nor PR_HTML is guaranteed to exist: a message composed
+     * in Outlook's Rich Text format only stores PR_RTF_COMPRESSED. Recover
+     * whichever of the two is still missing from that RTF - the real HTML if
+     * it's "\fromhtml1"-encapsulated (MS-OXRTFEX), otherwise just its plain
+     * text (RTF styling itself, e.g. fonts/colors, is not reconstructed). */
+    if (!msg->body || !msg->html_body) {
+        size_t rtf_compressed_size = 0;
+        uint8_t *rtf_compressed = msg_get_binary_prop(cfb, CFB_ROOT_ENTRY_ID, PR_RTF_COMPRESSED,
+                                                        &rtf_compressed_size);
+        if (rtf_compressed) {
+            size_t rtf_size = 0;
+            uint8_t *rtf = msg_rtf_decompress(rtf_compressed, rtf_compressed_size, &rtf_size);
+            free(rtf_compressed);
+            if (rtf) {
+                if (!msg->html_body) msg->html_body = msg_rtf_to_html(rtf, rtf_size, codepage);
+                if (!msg->body) msg->body = msg_rtf_to_text(rtf, rtf_size, codepage);
+                free(rtf);
+            }
+        }
+    }
+
+    if (!msg->html_body && msg->body) {
         msg->html_body = synthesize_html_from_body(msg->body);
     }
 
