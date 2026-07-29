@@ -110,10 +110,14 @@ jobs:
     container: archlinux:base-devel
 
     steps:
-    - uses: actions/checkout@v4
-
     - name: Install build dependencies
+      # Must run before checkout: archlinux:base-devel has no git, and
+      # actions/checkout silently falls back to a git-less REST API tarball
+      # download when it can't find one - which never creates a .git dir,
+      # breaking every git command run against $GITHUB_WORKSPACE later.
       run: pacman -Syu --noconfirm --needed qt6-base cmake git
+
+    - uses: actions/checkout@v4
 
     - name: Create non-root build user
       # makepkg refuses to run as root, but Actions' container jobs run as root.
