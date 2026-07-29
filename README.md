@@ -53,8 +53,12 @@ The built binary has no dependency beyond the Qt runtime libraries.
 
 On Arch Linux:
 ```bash
-makepkg -si  # uses the provided PKGBUILD
+cd packaging/arch
+makepkg -si                    # latest tagged release
+makepkg -si -p PKGBUILD-git    # latest git HEAD
 ```
+See `packaging/arch/README.md` for details, including the eventual AUR
+publishing path.
 
 ## Running
 
@@ -81,7 +85,8 @@ qt-msg-reader/
 ├── CMakeLists.txt           # Build configuration
 ├── README.md                # This file
 ├── CONTEXT.md               # Development context and notes
-├── PKGBUILD                 # Arch Linux package build
+├── LICENSE                  # MIT license text
+├── packaging/arch/          # Arch Linux PKGBUILDs (release + git) - see its README.md
 ├── src/
 │   ├── main.cpp             # Application entry point
 │   ├── MainWindow.h/cpp     # Main window UI

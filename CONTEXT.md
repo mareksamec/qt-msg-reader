@@ -26,7 +26,8 @@ qt-msg-reader/
 │   └── AttachmentModel.h/cpp # Table model for attachments display
 ├── libmsg/                # Pure-C .msg parsing library (own README, tests, CLI demo)
 ├── build/                 # Build output
-├── PKGBUILD               # Arch Linux package build
+├── packaging/arch/        # Arch Linux PKGBUILDs (release + git), own README.md
+├── LICENSE                # MIT license text
 ├── CMakeLists.txt         # Build configuration
 ├── README.md              # User documentation
 └── CONTEXT.md             # This file - development context
@@ -95,26 +96,39 @@ make -j$(nproc)
 
 ## GitHub Actions CI
 
-The workflow (`.github/workflows/cmake-multi-platform.yml`) builds for:
-- **ubuntu-latest** (GCC)
-- **windows-latest** (MSVC)
+The workflow (`.github/workflows/cmake-multi-platform.yml`) has four jobs:
+- **prepare**: computes the `build` job's OS matrix (see "Windows is
+  opt-in" below) - needed because a job's `if:` can't see `matrix.*`, so
+  gating a single matrix leg has to happen by shaping the matrix itself
+  instead.
+- **build**: `ubuntu-latest` (GCC), plus `windows-latest` (MSVC) when
+  requested. Installs Qt6 via `jurplel/install-qt-action`, builds (CMake
+  pulls in `libmsg/` as a subdirectory), and uploads one self-contained
+  executable archive per platform.
+- **build-arch**: builds the Arch Linux package in an `archlinux:base-devel`
+  container, on every push/PR, not just releases. See "Arch Linux Package"
+  below.
+- **release**: needs `build` + `build-arch`; see "Releases" below.
 
-Key steps:
-1. Installs Qt6 via `jurplel/install-qt-action`
-2. Builds the application (CMake pulls in `libmsg/` as a subdirectory)
-3. Uploads artifacts (single self-contained executable per platform)
+### Windows is opt-in
+
+The Windows leg only runs on a manual `workflow_dispatch` with the
+`build_windows` checkbox input ticked - plain pushes/PRs (and releases
+derived from them) are Linux-only by default. This matches the project's own
+TODO ("Remove Windows support - not needed as you can use Outlook on Win"),
+short of removing it outright.
 
 ### Releases
 
-The `release` job (needs: `build`) runs after every push to `main` (e.g. a PR
-merge) as well as on manual `workflow_dispatch` - but not on `pull_request`
-builds. Either way it's gated behind the `release` GitHub Environment's
-required-reviewer approval, so nothing publishes until someone clicks
-"Review deployments" → "Approve" on that job in the Actions UI, after
-confirming the build succeeded. **This requires one-time setup**: create an
-Environment named `release` under repo Settings → Environments, and add at
-least one required reviewer - the `environment: release` key in the workflow
-does nothing by itself until that environment has protection rules.
+The `release` job runs after every push to `main` (e.g. a PR merge) as well
+as on manual `workflow_dispatch` - but not on `pull_request` builds. Either
+way it's gated behind the `release` GitHub Environment's required-reviewer
+approval, so nothing publishes until someone clicks "Review deployments" →
+"Approve" on that job in the Actions UI, after confirming the build
+succeeded. **This requires one-time setup**: create an Environment named
+`release` under repo Settings → Environments, and add at least one required
+reviewer - the `environment: release` key in the workflow does nothing by
+itself until that environment has protection rules.
 
 Version tagging:
 - Manual `workflow_dispatch` run with a `version` input (e.g. `v1.2.0`) uses
@@ -125,7 +139,9 @@ Version tagging:
 
 Either way the release includes:
 - Linux binary (`qt-msg-reader-linux-x86_64.tar.gz`)
-- Windows binary (`qt-msg-reader-windows-x86_64.zip`)
+- Arch Linux package (`qt-msg-reader-<version>-<rel>-x86_64.pkg.tar.zst`)
+- Windows binary (`qt-msg-reader-windows-x86_64.zip`), only if the `build`
+  job's Windows leg actually ran (see above)
 - Source tarball (`source.tar.gz`)
 
 To release from a merge you approve of: go to the Actions run for that push,
@@ -135,13 +151,28 @@ workflow" → enter a version → approve the same way when it reaches the gate.
 
 ## Arch Linux Package
 
-A `PKGBUILD` file is provided for Arch Linux users. It only depends on
-`qt6-base` - no Python or vendored packages to install.
+`packaging/arch/` holds two PKGBUILDs (own `README.md` there has the full
+picture): `PKGBUILD` (versioned, `qt-msg-reader`, sourced from a GitHub
+release tag) and `PKGBUILD-git` (`qt-msg-reader-git`, always builds latest
+git HEAD). Both depend only on `qt6-base` - no Python or vendored packages.
+
+The `build-arch` CI job builds both on every push/PR - the `-git` one
+against the exact commit under test (via a `git+file://` override, since
+there's no need to wait for it to land on GitHub), and the versioned one
+using a locally generated source tarball instead of a real release tag
+(which may not exist yet for an arbitrary commit). Only the versioned
+package's `.pkg.tar.zst` is uploaded as a build artifact / attached to
+releases; the `-git` build is a build-only smoke test of the packaging
+recipe.
 
 To install on Arch Linux:
 ```bash
+cd packaging/arch
 makepkg -si
 ```
+
+Neither PKGBUILD is published to the AUR yet - see
+`packaging/arch/README.md` for what that would take.
 
 ## History: the Python bridge (removed)
 
@@ -155,6 +186,17 @@ old commit history and PR discussions make sense; none of it applies to the
 current codebase.
 
 ## Recent Changes
+- CI: Windows is now opt-in (`build_windows` workflow_dispatch input) instead
+  of building on every push/PR/release; added a `build-arch` job that builds
+  an Arch Linux package on every push/PR and attaches it to releases. See
+  `packaging/arch/` (moved out of the repo root, now with a `PKGBUILD-git`
+  alongside the original `PKGBUILD`) and "GitHub Actions CI" above. Added the
+  `LICENSE` file the PKGBUILD's `package()` installs but which didn't
+  previously exist.
+- MainWindow now persists window geometry, both splitters' sizes, the file
+  browser's column widths, and its set of expanded folders via `QSettings`,
+  restoring them on the next launch. A path line edit above the file browser
+  mirrors the current selection and jumps to a pasted path on Enter.
 - Releases now also run off a plain push to `main` (not just manual
   `workflow_dispatch`), gated behind the `release` GitHub Environment's
   required-reviewer approval; push-triggered releases auto-derive their
