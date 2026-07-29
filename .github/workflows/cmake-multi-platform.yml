@@ -127,12 +127,16 @@ jobs:
     - name: Build qt-msg-reader-git (smoke test against this commit)
       # Points the VCS source at this checkout instead of the network, so it
       # validates the PKGBUILD-git recipe against the exact commit under test
-      # rather than whatever happens to already be pushed to GitHub.
+      # rather than whatever happens to already be pushed to GitHub. builder
+      # can't necessarily read $GITHUB_WORKSPACE directly (Actions' container
+      # work dir isn't guaranteed world-readable), so root clones it into a
+      # /tmp copy owned by builder first, and that's what gets referenced.
       run: |
+        git clone --no-hardlinks -q "$GITHUB_WORKSPACE" /tmp/qt-msg-reader-src
         install -d -o builder -g builder /tmp/build-git
         cp packaging/arch/PKGBUILD-git /tmp/build-git/PKGBUILD
-        sed -i "s|^source=.*|source=(\"\${pkgname%-git}::git+file://${GITHUB_WORKSPACE}\")|" /tmp/build-git/PKGBUILD
-        chown -R builder:builder /tmp/build-git
+        sed -i "s|^source=.*|source=(\"\${pkgname%-git}::git+file:///tmp/qt-msg-reader-src\")|" /tmp/build-git/PKGBUILD
+        chown -R builder:builder /tmp/build-git /tmp/qt-msg-reader-src
         su builder -c 'cd /tmp/build-git && makepkg -s --noconfirm --nocheck'
 
     - name: Build qt-msg-reader (release artifact)
