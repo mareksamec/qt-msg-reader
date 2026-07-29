@@ -16,6 +16,10 @@
 #include <QMimeType>
 #include <QHash>
 #include <QTextDocument>
+#include <QSettings>
+#include <QCloseEvent>
+#include <QDir>
+#include <QItemSelectionModel>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -24,12 +28,19 @@ MainWindow::MainWindow(QWidget* parent)
 {
     setupUi();
     setupMenus();
-    
+
     resize(1000, 700);
     setWindowTitle(tr("Qt MSG Reader"));
+
+    loadSettings();
 }
 
 MainWindow::~MainWindow() = default;
+
+void MainWindow::closeEvent(QCloseEvent* event) {
+    saveSettings();
+    QMainWindow::closeEvent(event);
+}
 
 void MainWindow::setupMenus() {
     // Create File menu
@@ -43,7 +54,7 @@ void MainWindow::setupMenus() {
     
     QAction* exitAction = fileMenu->addAction(tr("E&xit"));
     exitAction->setShortcut(QKeySequence::Quit);
-    connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
+    connect(exitAction, &QAction::triggered, this, &QWidget::close);
     
     // Create Help menu
     QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -59,8 +70,18 @@ void MainWindow::setupUi() {
     m_mainSplitter = new QSplitter(Qt::Horizontal, this);
     setCentralWidget(m_mainSplitter);
     
-    // File browser panel
-    m_fileBrowser = new QTreeView(m_mainSplitter);
+    // File browser panel: a path editor (address bar) above the tree view
+    QWidget* fileBrowserPanel = new QWidget(m_mainSplitter);
+    QVBoxLayout* fileBrowserLayout = new QVBoxLayout(fileBrowserPanel);
+    fileBrowserLayout->setContentsMargins(0, 0, 0, 0);
+    fileBrowserLayout->setSpacing(2);
+
+    m_pathEdit = new QLineEdit(fileBrowserPanel);
+    m_pathEdit->setPlaceholderText(tr("Path..."));
+    connect(m_pathEdit, &QLineEdit::returnPressed, this, &MainWindow::onPathEditReturnPressed);
+    fileBrowserLayout->addWidget(m_pathEdit);
+
+    m_fileBrowser = new QTreeView(fileBrowserPanel);
     m_fileBrowser->setModel(m_fileModel);
     QModelIndex rootIndex = m_fileModel->setRootPath(QDir::homePath());
     m_fileBrowser->setRootIndex(rootIndex);
@@ -70,7 +91,13 @@ void MainWindow::setupUi() {
     m_fileBrowser->sortByColumn(0, Qt::AscendingOrder);
     m_fileBrowser->setAlternatingRowColors(true);
     connect(m_fileBrowser, &QTreeView::doubleClicked, this, &MainWindow::onFileDoubleClicked);
-    
+    connect(m_fileBrowser, &QTreeView::expanded, this, &MainWindow::onFileBrowserExpanded);
+    connect(m_fileBrowser, &QTreeView::collapsed, this, &MainWindow::onFileBrowserCollapsed);
+    connect(m_fileBrowser->selectionModel(), &QItemSelectionModel::currentChanged,
+            this, &MainWindow::onFileBrowserCurrentChanged);
+    connect(m_fileModel, &QFileSystemModel::directoryLoaded, this, &MainWindow::onDirectoryLoaded);
+    fileBrowserLayout->addWidget(m_fileBrowser);
+
     // Vertical splitter for message content
     m_contentSplitter = new QSplitter(Qt::Vertical, m_mainSplitter);
     
@@ -382,6 +409,112 @@ void MainWindow::onAttachmentDoubleClicked(const QModelIndex& index) {
                 tr("Failed to save attachment: %1").arg(savePath));
         }
     }
+}
+
+void MainWindow::onFileBrowserCurrentChanged(const QModelIndex& current) {
+    if (!current.isValid()) return;
+    m_pathEdit->setText(m_fileModel->filePath(current));
+}
+
+void MainWindow::onPathEditReturnPressed() {
+    QString path = QDir::cleanPath(m_pathEdit->text().trimmed());
+    if (path.isEmpty()) return;
+
+    QFileInfo info(path);
+    if (!info.exists()) {
+        logWarning(tr("Path does not exist: %1").arg(path));
+        return;
+    }
+
+    QModelIndex index = m_fileModel->index(path);
+    if (!index.isValid()) {
+        logWarning(tr("Path is not accessible: %1").arg(path));
+        return;
+    }
+
+    m_fileBrowser->setCurrentIndex(index);
+    m_fileBrowser->scrollTo(index);
+    if (info.isDir()) {
+        m_fileBrowser->setExpanded(index, true);
+    } else if (path.endsWith(".msg", Qt::CaseInsensitive)) {
+        loadFile(path);
+    }
+}
+
+void MainWindow::onFileBrowserExpanded(const QModelIndex& index) {
+    m_expandedPaths.insert(m_fileModel->filePath(index));
+}
+
+void MainWindow::onFileBrowserCollapsed(const QModelIndex& index) {
+    m_expandedPaths.remove(m_fileModel->filePath(index));
+}
+
+void MainWindow::onDirectoryLoaded(const QString& path) {
+    expandPendingPaths(path);
+}
+
+void MainWindow::expandPendingPaths(const QString& loadedPath) {
+    if (m_pendingExpandedPaths.isEmpty()) return;
+
+    QString cleanLoadedPath = QDir::cleanPath(loadedPath);
+    const QList<QString> pending = m_pendingExpandedPaths.values();
+    for (const QString& path : pending) {
+        if (QDir::cleanPath(QFileInfo(path).path()) != cleanLoadedPath) continue;
+
+        m_pendingExpandedPaths.remove(path);
+        QModelIndex index = m_fileModel->index(path);
+        if (index.isValid()) {
+            // Expanding asks the model to fetch this folder's children, which will
+            // eventually emit directoryLoaded(path) again and continue the cascade
+            // into any of its own pending descendants.
+            m_fileBrowser->setExpanded(index, true);
+        }
+    }
+}
+
+void MainWindow::loadSettings() {
+    QSettings settings;
+
+    settings.beginGroup("MainWindow");
+    if (settings.contains("geometry")) {
+        restoreGeometry(settings.value("geometry").toByteArray());
+    }
+    if (settings.contains("mainSplitterState")) {
+        m_mainSplitter->restoreState(settings.value("mainSplitterState").toByteArray());
+    }
+    if (settings.contains("contentSplitterState")) {
+        m_contentSplitter->restoreState(settings.value("contentSplitterState").toByteArray());
+    }
+    settings.endGroup();
+
+    settings.beginGroup("FileBrowser");
+    if (settings.contains("headerState")) {
+        m_fileBrowser->header()->restoreState(settings.value("headerState").toByteArray());
+    }
+    QStringList expandedPaths = settings.value("expandedPaths").toStringList();
+    settings.endGroup();
+
+    if (!expandedPaths.isEmpty()) {
+        m_pendingExpandedPaths = QSet<QString>(expandedPaths.begin(), expandedPaths.end());
+        // The root directory may already be loaded by the time settings are restored
+        // (or may still be loading, in which case onDirectoryLoaded() will pick this up).
+        expandPendingPaths(m_fileModel->rootPath());
+    }
+}
+
+void MainWindow::saveSettings() {
+    QSettings settings;
+
+    settings.beginGroup("MainWindow");
+    settings.setValue("geometry", saveGeometry());
+    settings.setValue("mainSplitterState", m_mainSplitter->saveState());
+    settings.setValue("contentSplitterState", m_contentSplitter->saveState());
+    settings.endGroup();
+
+    settings.beginGroup("FileBrowser");
+    settings.setValue("headerState", m_fileBrowser->header()->saveState());
+    settings.setValue("expandedPaths", QStringList(m_expandedPaths.values()));
+    settings.endGroup();
 }
 
 void MainWindow::log(const QString& message) {
