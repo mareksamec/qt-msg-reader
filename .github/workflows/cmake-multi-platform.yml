@@ -11,21 +11,40 @@ on:
         description: 'Release version (e.g., v1.0.0). Leave blank to auto-derive from CMakeLists.txt + commit SHA.'
         required: false
         type: string
+      build_windows:
+        description: 'Also build the Windows target (skipped by default on push/PR/release).'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
+  prepare:
+    # Computes the build matrix so the windows-latest leg can be left out
+    # entirely (rather than just skipped) unless explicitly requested: plain
+    # pushes/PRs (and releases derived from them) never set build_windows,
+    # so it's Linux-only there by default. Only a manual workflow_dispatch
+    # run with build_windows checked adds Windows back in.
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - id: set-matrix
+      run: |
+        linux='{"os":"ubuntu-latest","c_compiler":"gcc","cpp_compiler":"g++"}'
+        windows='{"os":"windows-latest","c_compiler":"cl","cpp_compiler":"cl"}'
+        if [ "${{ inputs.build_windows }}" = "true" ]; then
+          echo "matrix={\"include\":[$linux,$windows]}" >> "$GITHUB_OUTPUT"
+        else
+          echo "matrix={\"include\":[$linux]}" >> "$GITHUB_OUTPUT"
+        fi
+
   build:
+    needs: prepare
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     steps:
     - uses: actions/checkout@v4
@@ -86,8 +105,62 @@ jobs:
         path: |
           ${{ steps.strings.outputs.build-output-dir }}/qt-msg-reader-*
 
+  build-arch:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: pacman -Syu --noconfirm --needed qt6-base cmake git
+
+    - name: Create non-root build user
+      # makepkg refuses to run as root, but Actions' container jobs run as root.
+      # Mark the checkout safe for git (rather than chowning it) so both root
+      # (the later "git archive" step) and builder (the git+file:// clone
+      # below) can run git commands against it without ownership complaints.
+      run: |
+        useradd -m builder
+        git config --system --add safe.directory '*'
+
+    - name: Build qt-msg-reader-git (smoke test against this commit)
+      # Points the VCS source at this checkout instead of the network, so it
+      # validates the PKGBUILD-git recipe against the exact commit under test
+      # rather than whatever happens to already be pushed to GitHub.
+      run: |
+        install -d -o builder -g builder /tmp/build-git
+        cp packaging/arch/PKGBUILD-git /tmp/build-git/PKGBUILD
+        sed -i "s|^source=.*|source=(\"\${pkgname%-git}::git+file://${GITHUB_WORKSPACE}\")|" /tmp/build-git/PKGBUILD
+        chown -R builder:builder /tmp/build-git
+        su builder -c 'cd /tmp/build-git && makepkg -s --noconfirm --nocheck'
+
+    - name: Build qt-msg-reader (release artifact)
+      # Same PKGBUILD that's committed, just pointed at a locally generated
+      # source tarball instead of a GitHub release tag - that tag may not
+      # exist yet (or ever, for a non-release push), so this can't rely on
+      # downloading it.
+      run: |
+        pkgver=$(grep -oP '(?<=VERSION )[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1)
+        install -d -o builder -g builder /tmp/build-release
+        cp packaging/arch/PKGBUILD /tmp/build-release/PKGBUILD
+        sed -i "s/^pkgver=.*/pkgver=${pkgver}/" /tmp/build-release/PKGBUILD
+        sed -i "s/^sha256sums=.*/sha256sums=('SKIP')/" /tmp/build-release/PKGBUILD
+        git archive --format=tar.gz --prefix="qt-msg-reader-${pkgver}/" \
+            -o "/tmp/build-release/qt-msg-reader-${pkgver}.tar.gz" HEAD
+        chown -R builder:builder /tmp/build-release
+        su builder -c 'cd /tmp/build-release && makepkg -s --noconfirm --nocheck'
+        mkdir -p arch-release
+        cp /tmp/build-release/*.pkg.tar.zst arch-release/
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: qt-msg-reader-arch
+        path: arch-release/*.pkg.tar.zst
+
   release:
-    needs: build
+    needs: [build, build-arch]
     runs-on: ubuntu-latest
     # Never on pull_request builds; on a plain push (e.g. a PR merge to main)
     # or a manual workflow_dispatch, the job still only actually publishes
@@ -125,7 +198,11 @@ jobs:
       run: |
         mkdir -p release
         mv artifacts/qt-msg-reader-ubuntu-latest/*.tar.gz release/
-        mv artifacts/qt-msg-reader-windows-latest/*.zip release/
+        mv artifacts/qt-msg-reader-arch/*.pkg.tar.zst release/
+        # Windows is opt-in (see build_windows input), so its artifact may not exist.
+        if [ -d artifacts/qt-msg-reader-windows-latest ]; then
+          mv artifacts/qt-msg-reader-windows-latest/*.zip release/
+        fi
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
