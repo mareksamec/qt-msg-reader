@@ -51,6 +51,11 @@ make -j$(nproc)
 
 The built binary has no dependency beyond the Qt runtime libraries.
 
+On Linux, `cmake --install` (and therefore the Arch package below) also
+installs a `.desktop` entry and a `hicolor` theme app icon (SVG + PNG
+fallbacks at standard sizes), so the app shows up in application launchers
+with its own icon. See `resources/`.
+
 On Arch Linux:
 ```bash
 cd packaging/arch
@@ -87,6 +92,7 @@ qt-msg-reader/
 ├── CONTEXT.md               # Development context and notes
 ├── LICENSE                  # MIT license text
 ├── packaging/arch/          # Arch Linux PKGBUILDs (release + git) - see its README.md
+├── resources/               # Desktop entry + hicolor app icon (SVG + PNG sizes)
 ├── src/
 │   ├── main.cpp             # Application entry point
 │   ├── MainWindow.h/cpp     # Main window UI

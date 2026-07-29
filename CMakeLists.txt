@@ -48,3 +48,19 @@ install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
 )
+
+if(UNIX AND NOT APPLE)
+    install(FILES resources/qt-msg-reader.desktop
+        DESTINATION share/applications
+    )
+
+    install(FILES resources/icons/hicolor/scalable/apps/qt-msg-reader.svg
+        DESTINATION share/icons/hicolor/scalable/apps
+    )
+
+    foreach(icon_size 16 22 24 32 48 64 128 256)
+        install(FILES resources/icons/hicolor/${icon_size}x${icon_size}/apps/qt-msg-reader.png
+            DESTINATION share/icons/hicolor/${icon_size}x${icon_size}/apps
+        )
+    endforeach()
+endif()

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16223e"/>
+      <stop offset="45%" stop-color="#33456e"/>
+      <stop offset="100%" stop-color="#94a0af"/>
+    </linearGradient>
+    <linearGradient id="bevelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7f8fae" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#7f8fae" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="glossGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="envGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#dde2ea"/>
+    </linearGradient>
+    <linearGradient id="flapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f4f6f9"/>
+      <stop offset="100%" stop-color="#c9d0dc"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.5"/>
+      <feOffset dx="0" dy="5" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.45"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- outer badge shadow -->
+  <rect x="10" y="12" width="236" height="236" rx="50" ry="50" fill="#000000" opacity="0.25"/>
+
+  <!-- badge background: rounded square, navy-to-gray gradient -->
+  <rect x="8" y="8" width="236" height="236" rx="50" ry="50" fill="url(#bgGrad)" stroke="#0d1526" stroke-width="2"/>
+
+  <!-- inner top bevel highlight (classic Tango/GNOME2 inset edge) -->
+  <rect x="12" y="12" width="228" height="228" rx="46" ry="46" fill="none" stroke="url(#bevelGrad)" stroke-width="3"/>
+
+  <!-- glossy top highlight -->
+  <path d="M 8 58 Q 8 8 58 8 L 194 8 Q 244 8 244 58 L 244 96 Q 128 130 8 96 Z" fill="url(#glossGrad)"/>
+
+  <!-- envelope group with drop shadow -->
+  <g filter="url(#dropShadow)">
+    <rect x="44" y="86" width="168" height="116" rx="11" ry="11" fill="url(#envGrad)" stroke="#57606f" stroke-width="3.5"/>
+    <path d="M 47 92 L 128 150 L 209 92 L 209 100 L 128 159 L 47 100 Z" fill="url(#flapGrad)" stroke="#57606f" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+
+  <!-- MSG label -->
+  <text x="128" y="190" font-family="'DejaVu Sans', 'Liberation Sans', Arial, sans-serif" font-weight="bold" font-size="36" fill="#243254" text-anchor="middle" letter-spacing="3">MSG</text>
+</svg>

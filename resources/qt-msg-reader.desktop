@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Qt Message Reader
+GenericName=Outlook MSG Viewer
+Comment=View Microsoft Outlook .msg email files
+Exec=qt-msg-reader %f
+Icon=qt-msg-reader
+Terminal=false
+Categories=Office;Email;Viewer;
+MimeType=application/vnd.ms-outlook;
+Keywords=email;mail;msg;outlook;message;

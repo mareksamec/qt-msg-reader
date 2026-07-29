@@ -27,6 +27,7 @@ qt-msg-reader/
 ├── libmsg/                # Pure-C .msg parsing library (own README, tests, CLI demo)
 ├── build/                 # Build output
 ├── packaging/arch/        # Arch Linux PKGBUILDs (release + git), own README.md
+├── resources/             # .desktop entry + hicolor app icon (SVG source + PNG sizes)
 ├── LICENSE                # MIT license text
 ├── CMakeLists.txt         # Build configuration
 ├── README.md              # User documentation
@@ -186,6 +187,12 @@ old commit history and PR discussions make sense; none of it applies to the
 current codebase.
 
 ## Recent Changes
+- Added a `resources/` directory with a `.desktop` entry and a `hicolor`
+  theme app icon (`qt-msg-reader.svg`, GNOME2/Tango-styled navy-to-gray
+  envelope badge, plus rendered PNG fallbacks at 16-256px). `CMakeLists.txt`
+  installs both on Linux (`if(UNIX AND NOT APPLE)`), so `cmake --install`
+  and the Arch package now register the app with a proper name/icon in
+  application launchers instead of a generic fallback.
 - CI: Windows is now opt-in (`build_windows` workflow_dispatch input) instead
   of building on every push/PR/release; added a `build-arch` job that builds
   an Arch Linux package on every push/PR and attaches it to releases. See
