@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.0)'
-        required: true
+        description: 'Release version (e.g., v1.0.0). Leave blank to auto-derive from CMakeLists.txt + commit SHA.'
+        required: false
         type: string
 
 jobs:
@@ -89,10 +89,27 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    # Never on pull_request builds; on a plain push (e.g. a PR merge to main)
+    # or a manual workflow_dispatch, the job still only actually publishes
+    # once approved via the "release" environment's required reviewers -
+    # see the "environment:" key below. That gate is configured in repo
+    # Settings -> Environments, not in this file.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment: release
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+        else
+          project_version=$(grep -oP '(?<=VERSION )[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1)
+          short_sha=$(git rev-parse --short HEAD)
+          echo "value=v${project_version}-${short_sha}" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -113,8 +130,8 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ inputs.version }}
-        name: Release ${{ inputs.version }}
+        tag_name: ${{ steps.version.outputs.value }}
+        name: Release ${{ steps.version.outputs.value }}
         draft: false
         prerelease: false
         files: release/*

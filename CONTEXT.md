@@ -104,16 +104,34 @@ Key steps:
 2. Builds the application (CMake pulls in `libmsg/` as a subdirectory)
 3. Uploads artifacts (single self-contained executable per platform)
 
-### Manual Releases
+### Releases
 
-To create a release:
-1. Go to Actions → Build workflow
-2. Click "Run workflow"
-3. Enter version (e.g., `v1.0.0`)
-4. The workflow will create a GitHub Release with:
-   - Linux binary (`qt-msg-reader-linux-x86_64.tar.gz`)
-   - Windows binary (`qt-msg-reader-windows-x86_64.zip`)
-   - Source tarball (`source.tar.gz`)
+The `release` job (needs: `build`) runs after every push to `main` (e.g. a PR
+merge) as well as on manual `workflow_dispatch` - but not on `pull_request`
+builds. Either way it's gated behind the `release` GitHub Environment's
+required-reviewer approval, so nothing publishes until someone clicks
+"Review deployments" → "Approve" on that job in the Actions UI, after
+confirming the build succeeded. **This requires one-time setup**: create an
+Environment named `release` under repo Settings → Environments, and add at
+least one required reviewer - the `environment: release` key in the workflow
+does nothing by itself until that environment has protection rules.
+
+Version tagging:
+- Manual `workflow_dispatch` run with a `version` input (e.g. `v1.2.0`) uses
+  that tag.
+- Any other run (i.e. a plain push to `main`) auto-derives a tag from
+  `CMakeLists.txt`'s `project(... VERSION x.y.z ...)` plus the short commit
+  SHA, e.g. `v1.0.0-abc1234`, since there's no version input to type on a push.
+
+Either way the release includes:
+- Linux binary (`qt-msg-reader-linux-x86_64.tar.gz`)
+- Windows binary (`qt-msg-reader-windows-x86_64.zip`)
+- Source tarball (`source.tar.gz`)
+
+To release from a merge you approve of: go to the Actions run for that push,
+find the pending `release` job, review it, and approve. To release
+ad hoc with a specific version instead: Actions → Build workflow → "Run
+workflow" → enter a version → approve the same way when it reaches the gate.
 
 ## Arch Linux Package
 
@@ -137,6 +155,11 @@ old commit history and PR discussions make sense; none of it applies to the
 current codebase.
 
 ## Recent Changes
+- Releases now also run off a plain push to `main` (not just manual
+  `workflow_dispatch`), gated behind the `release` GitHub Environment's
+  required-reviewer approval; push-triggered releases auto-derive their
+  version tag from CMakeLists.txt + short SHA since there's no version input
+  to type. See "Releases" above - requires one-time Environment setup.
 - RTF fallback: libmsg now decompresses PR_RTF_COMPRESSED (MS-OXRTFCP) and, when
   it isn't already present as PR_HTML, recovers the real HTML from RTF that
   encapsulates it (MS-OXRTFEX `\fromhtml1`/`\htmltag`/`\htmlrtf`), or otherwise
