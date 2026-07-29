@@ -15,8 +15,15 @@ sha256sums=('SKIP')
 
 pkgver() {
     cd "${pkgname%-git}"
-    git describe --long --tags 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' \
-        || printf 'r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+    # git describe's own exit status has to be checked directly - piping it
+    # into sed and testing the pipe's exit status instead always "succeeds"
+    # (sed doesn't fail on empty input), silently yielding an empty pkgver
+    # whenever there's no tag reachable from HEAD (e.g. a shallow clone).
+    if desc=$(git describe --long --tags 2>/dev/null); then
+        printf '%s' "$desc" | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+    else
+        printf 'r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+    fi
 }
 
 build() {
