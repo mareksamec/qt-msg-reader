@@ -1,6 +1,6 @@
 # Maintainer: Marek Samec
 pkgname=qt-msg-reader
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="A Qt-based application for reading Microsoft Outlook MSG files"
 arch=('x86_64')
