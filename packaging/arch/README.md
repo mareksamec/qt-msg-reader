@@ -10,6 +10,13 @@ Two PKGBUILDs are kept here, both validated in CI on every push/PR
 - **`PKGBUILD-git`** (`qt-msg-reader-git`) - a VCS package that always builds
   the latest commit on the repo's default branch, using `pkgver()` +
   `git describe` the way most `-git` AUR packages do.
+- **`SRCINFO-git`** - a generated preview of what `PKGBUILD-git` produces,
+  kept here for reference only. It is *generated*, never hand-edited; after
+  changing `PKGBUILD-git`, refresh it with
+  `makepkg --printsrcinfo -p PKGBUILD-git > SRCINFO-git`. Note its `pkgver`
+  is the placeholder declared in the PKGBUILD (`--printsrcinfo` does not run
+  `pkgver()`); the AUR clone's real `.SRCINFO` gets the `git describe` value
+  once the source has been fetched.
 
 ## Building locally
 

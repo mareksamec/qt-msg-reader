@@ -1,25 +1,22 @@
 # libmsg
 
 A small, dependency-free C library for reading the fields most applications
-need out of Microsoft Outlook `.msg` files. Written to replace the Python
-`extract_msg` dependency used elsewhere in this project (see the top-level
-`CONTEXT.md`) with something that links directly into the Qt/C++ app and has
-no runtime dependency on a Python interpreter.
+need out of Microsoft Outlook `.msg` files. It links directly into the
+Qt/C++ app and pulls in no runtime dependencies of its own.
 
 ## Scope
 
 `.msg` files are Compound File Binary (OLE2) containers holding MAPI
-properties (MS-CFB + MS-OXMSG). `extract_msg` implements a very large
-surface of that format (calendar/contact/task items, S/MIME-signed
-messages, named properties, RTF (de)compression, embedded `.msg`
-attachments, character-set auto-detection, etc). This library deliberately
-covers only the common case, matching what this project's `MsgParser`
-actually used:
+properties (MS-CFB + MS-OXMSG). The full format surface is very large
+(calendar/contact/task items, S/MIME-signed messages, named properties,
+RTF (de)compression, embedded `.msg` attachments, character-set
+auto-detection, etc). This library deliberately covers only the common
+case, matching what this project's `MsgParser` actually needs:
 
 * Subject, plain text body, HTML body (from PR_HTML if present; otherwise
   recovered from PR_RTF_COMPRESSED - either the real HTML if the RTF is
   "\fromhtml1"-encapsulated (MS-OXRTFEX), or as a last resort synthesized
-  from the plain text body, same fallback `extract_msg` uses)
+  from the plain text body)
 * Sender name and email
 * Send/delivery date
 * Recipients (name, email, To/Cc/Bcc)
