@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Qt Message Reader
+Name=Qt MSG Reader
 GenericName=Outlook MSG Viewer
 Comment=View Microsoft Outlook .msg email files
 Exec=qt-msg-reader %f
