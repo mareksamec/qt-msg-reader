@@ -179,9 +179,16 @@ void MainWindow::setupUi() {
     m_attachmentView->verticalHeader()->setVisible(false);
     m_attachmentView->setAlternatingRowColors(true);
     connect(m_attachmentView, &QTableView::doubleClicked, this, &MainWindow::onAttachmentDoubleClicked);
-    
+    connect(m_attachmentView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &MainWindow::onAttachmentSelectionChanged);
+
     attachmentLayout->addWidget(m_attachmentView);
-    
+
+    m_saveAttachmentButton = new QPushButton(tr("Save Attachment..."));
+    m_saveAttachmentButton->setEnabled(false);
+    connect(m_saveAttachmentButton, &QPushButton::clicked, this, &MainWindow::onSaveAttachment);
+    attachmentLayout->addWidget(m_saveAttachmentButton);
+
     m_contentSplitter->addWidget(attachmentGroup);
     
     // Status log section
@@ -371,11 +378,19 @@ void MainWindow::onSaveAttachment() {
         if (file.open(QIODevice::WriteOnly)) {
             file.write(att.data);
             file.close();
+            log(tr("Saved attachment: %1").arg(savePath));
+            QMessageBox::information(this, tr("Saved"),
+                tr("Attachment saved to: %1").arg(savePath));
         } else {
+            logError(tr("Failed to save attachment: %1").arg(savePath));
             QMessageBox::warning(this, tr("Error"),
                 tr("Failed to save attachment: %1").arg(savePath));
         }
     }
+}
+
+void MainWindow::onAttachmentSelectionChanged() {
+    m_saveAttachmentButton->setEnabled(m_attachmentView->currentIndex().isValid());
 }
 
 void MainWindow::onFileDoubleClicked(const QModelIndex& index) {
