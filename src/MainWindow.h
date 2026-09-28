@@ -10,6 +10,7 @@
 #include <QSplitter>
 #include <QTabWidget>
 #include <QSet>
+#include <QPushButton>
 #include "MsgParser.h"
 #include "MsgFileModel.h"
 #include "AttachmentModel.h"
@@ -43,6 +44,8 @@ private slots:
     void onFileDoubleClicked(const QModelIndex& index);
     /** Handles double-click on an attachment to save it. */
     void onAttachmentDoubleClicked(const QModelIndex& index);
+    /** Enables/disables the Save Attachment button based on selection. */
+    void onAttachmentSelectionChanged();
     /** Updates the path editor to reflect the newly selected browser item. */
     void onFileBrowserCurrentChanged(const QModelIndex& current);
     /** Navigates the file browser to (and, for .msg files, opens) the typed/pasted path. */
@@ -100,6 +103,7 @@ private:
     
     QTableView* m_attachmentView;
     AttachmentModel* m_attachmentModel;
+    QPushButton* m_saveAttachmentButton;
     
     QTextEdit* m_statusLog;
     
